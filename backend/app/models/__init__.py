@@ -1,0 +1,1 @@
+# SQLAlchemy ORM models will live here when a database is integrated.

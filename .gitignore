@@ -1,0 +1,55 @@
+# ── Python ───────────────────────────���─────────────────────────────���──────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+.env
+*.env.local
+
+# ── ML artefacts ──────────────────────────────────────────────────────────────
+backend/artifacts/*.pkl
+backend/artifacts/*.json
+# Keep the directory itself
+!backend/artifacts/.gitkeep
+
+# ── Reports ───────────────────────────────────────────────────────────────────
+reports/*.pdf
+reports/*.csv
+reports/*.pptx
+reports/*.md
+!reports/.gitkeep
+
+# ── Node / frontend ───────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# ── Data (large files) ──────────────────────────────────��─────────────────────
+# Uncomment if you want to exclude the dataset from git:
+# data/*.csv
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
