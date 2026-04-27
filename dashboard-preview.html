@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Retention AI — Executive Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{
+  --navy:#0a2342;--navy2:#12355e;--navy3:#1a4a7a;
+  --accent:#1a6bac;--accent2:#e8f2fb;
+  --red:#c0392b;--red2:#fdf0ef;
+  --green:#1a7a4a;--green2:#edf7f2;
+  --amber:#b45309;--amber2:#fef3e2;
+  --gray1:#f8f9fa;--gray2:#f0f2f4;--gray3:#e2e6ea;--gray4:#9aa3ad;--gray5:#5a6472;
+  --text:#1a2332;--border:rgba(0,0,0,0.09);
+  --shadow:0 2px 16px rgba(0,0,0,0.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#fff;color:var(--text);overflow:hidden;height:100vh}
+/* LAYOUT */
+.app{display:flex;height:100vh}
+/* SIDEBAR */
+.sb{width:210px;min-width:210px;background:var(--navy);display:flex;flex-direction:column;z-index:10}
+.sb-head{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.sb-logo{display:flex;align-items:center;gap:10px}
+.sb-icon{width:32px;height:32px;background:linear-gradient(135deg,#1a6bac,#4d9de0);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.sb-brand{font-size:13px;font-weight:700;color:#fff;letter-spacing:.3px}
+.sb-sub{font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;letter-spacing:.5px;text-transform:uppercase}
+.sb-section{padding:14px 0 4px 18px;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,0.28);font-weight:700}
+.nav{display:flex;align-items:center;gap:10px;padding:9px 18px;font-size:12px;color:rgba(255,255,255,0.52);cursor:pointer;border-left:2px solid transparent;transition:all .18s;position:relative}
+.nav:hover{color:rgba(255,255,255,0.88);background:rgba(255,255,255,0.05)}
+.nav.on{color:#fff;background:rgba(255,255,255,0.09);border-left-color:#4d9de0;font-weight:600}
+.nav-badge{position:absolute;right:14px;background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7);font-size:9px;padding:1px 6px;border-radius:10px;font-weight:700}
+.nav.on .nav-badge{background:#c0392b;color:#fff}
+.sb-footer{margin-top:auto;padding:14px 18px;border-top:1px solid rgba(255,255,255,0.08)}
+.live-dot{display:inline-block;width:7px;height:7px;background:#22c55e;border-radius:50%;margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+.sb-live{font-size:10px;color:rgba(255,255,255,0.5)}
+.sb-time{font-size:11px;color:rgba(255,255,255,0.8);font-weight:600;margin-top:3px}
+/* CONTENT */
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#fff}
+/* TOPBAR */
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:0 1px 0 var(--border)}
+.tb-left{display:flex;align-items:center;gap:12px}
+.tb-title{font-size:15px;font-weight:700;color:var(--text)}
+.tb-subtitle{font-size:11px;color:var(--gray4)}
+.tb-right{display:flex;align-items:center;gap:8px}
+.chip{background:var(--gray1);border:1px solid var(--gray3);border-radius:20px;padding:3px 11px;font-size:10px;color:var(--gray5);font-weight:600;letter-spacing:.2px}
+.chip.live{background:#edf7f2;color:var(--green);border-color:#b7e5cf}
+.chip.warn{background:var(--amber2);color:var(--amber);border-color:#f9c87a}
+.tb-btn{background:var(--navy);color:#fff;border:none;padding:6px 14px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.4px;transition:background .15s}
+.tb-btn:hover{background:var(--navy2)}
+/* MAIN */
+.main{flex:1;overflow-y:auto;padding:20px 24px;background:var(--gray1)}
+.pg{display:none;animation:fadein .25s ease}.pg.on{display:block}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+/* KPI STRIP */
+.kstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.kstrip2{grid-template-columns:repeat(4,minmax(0,1fr))}
+.kcard{background:#fff;border:1px solid var(--border);border-radius:6px;padding:14px 16px;position:relative;overflow:hidden;transition:box-shadow .2s,transform .2s;cursor:default}
+.kcard:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
+.kcard-accent{position:absolute;top:0;left:0;right:0;height:3px}
+.klabel{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--gray4);font-weight:700;margin-bottom:5px}
+.knum{font-size:24px;font-weight:800;color:var(--text);line-height:1;font-variant-numeric:tabular-nums}
+.kdelta{font-size:10px;margin-top:5px;display:flex;align-items:center;gap:4px;font-weight:600}
+.up{color:var(--green)}.dn{color:var(--red)}
+/* PANEL */
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.panel{background:#fff;border:1px solid var(--border);border-radius:6px;padding:16px}
+.ptitle{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:var(--gray4);margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--gray3);display:flex;align-items:center;justify-content:space-between}
+.ptitle-right{font-size:10px;font-weight:600;color:var(--accent);cursor:pointer;text-transform:none;letter-spacing:0}
+/* TABLE */
+.tbl-wrap{background:#fff;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-top:0}
+.tbl{width:100%;border-collapse:collapse;font-size:11px}
+.tbl th{background:var(--navy);color:rgba(255,255,255,0.75);padding:8px 12px;text-align:left;font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;position:sticky;top:0}
+.tbl td{padding:8px 12px;color:var(--text);border-bottom:1px solid var(--gray2);transition:background .1s}
+.tbl tr:last-child td{border:none}
+.tbl tr:hover td{background:var(--accent2)}
+/* TAGS */
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:3px;font-size:9.5px;font-weight:800;letter-spacing:.3px}
+.tag-h{background:var(--red2);color:var(--red)}
+.tag-m{background:var(--amber2);color:var(--amber)}
+.tag-l{background:var(--green2);color:var(--green)}
+.tag-b{background:var(--accent2);color:var(--accent)}
+/* FILTER */
+.frow{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.frow select,.frow input{font-size:11px;padding:6px 10px;border-radius:4px;border:1px solid var(--gray3);background:#fff;color:var(--text);outline:none;transition:border .15s}
+.frow select:focus,.frow input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(26,107,172,0.1)}
+.frow input{width:190px}
+.fcount{font-size:11px;color:var(--gray4);font-weight:600;margin-left:auto}
+/* MODELS */
+.mcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.mcard{background:#fff;border:1px solid var(--border);border-radius:6px;padding:14px;transition:box-shadow .2s}
+.mcard:hover{box-shadow:var(--shadow)}
+.mcard.best{border-color:var(--accent);border-width:2px;box-shadow:0 0 0 3px rgba(26,107,172,0.07)}
+.mname{font-size:12px;font-weight:800;color:var(--text);margin-bottom:8px}
+.mbadge{background:var(--accent2);color:var(--accent);font-size:9px;font-weight:800;padding:2px 8px;border-radius:3px;letter-spacing:.5px;display:inline-block;margin-bottom:7px;text-transform:uppercase}
+.mrow{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--gray4);padding:4px 0;border-bottom:1px solid var(--gray2)}
+.mrow:last-child{border:none}
+.mval{font-weight:800;color:var(--text);font-size:12px}
+/* FEAT BARS */
+.fbar-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.fbar-lbl{font-size:10.5px;color:var(--gray5);width:125px;text-align:right;flex-shrink:0}
+.fbar-bg{flex:1;background:var(--gray2);border-radius:3px;height:9px;overflow:hidden}
+.fbar-fill{height:9px;border-radius:3px;background:var(--accent);transition:width 1.2s cubic-bezier(.4,0,.2,1);width:0}
+.fbar-pct{font-size:10.5px;color:var(--text);width:28px;font-weight:800}
+/* PROG BARS */
+.prog-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.prog-lbl{font-size:11px;color:var(--text);flex:1;font-weight:600}
+.prog-bg{width:140px;background:var(--gray2);border-radius:3px;height:7px;overflow:hidden}
+.prog-fill{height:7px;border-radius:3px;transition:width 1s cubic-bezier(.4,0,.2,1);width:0}
+.prog-val{font-size:11px;font-weight:800;width:38px;text-align:right}
+/* RECO CARDS */
+.rcards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rcard{background:#fff;border:1px solid var(--border);border-radius:6px;padding:14px;border-left:3px solid var(--accent);transition:box-shadow .2s,transform .2s;cursor:default}
+.rcard:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
+.rcard.r1{border-left-color:var(--red)}
+.rcard.r2{border-left-color:var(--amber)}
+.rcard.r3{border-left-color:var(--accent)}
+.rcard.r4{border-left-color:var(--green)}
+.rc-count{font-size:20px;font-weight:800;margin-bottom:3px}
+.rc-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px}
+.rc-meta{font-size:10px;color:var(--gray4);line-height:1.5}
+/* CHAT */
+.chat-box{background:#fff;border:1px solid var(--border);border-radius:6px;padding:16px;height:310px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:10px;scroll-behavior:smooth}
+.bubble{max-width:80%;padding:9px 14px;font-size:12px;line-height:1.6;border-radius:4px}
+.bu{background:var(--navy);color:#fff;align-self:flex-end;border-radius:8px 8px 0 8px}
+.ba{background:var(--gray1);color:var(--text);align-self:flex-start;border:1px solid var(--border);border-radius:8px 8px 8px 0}
+.ba-head{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--accent);margin-bottom:5px}
+.ba b{color:var(--navy);font-weight:800}
+.typing{display:flex;gap:5px;align-items:center;padding:10px 14px;background:var(--gray1);border:1px solid var(--border);border-radius:8px 8px 8px 0;align-self:flex-start}
+.typing span{width:7px;height:7px;background:var(--gray4);border-radius:50%;animation:blink 1.4s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{transform:scale(.8);opacity:.5}40%{transform:scale(1);opacity:1}}
+.cinput{display:flex;gap:8px}
+.cinput input{flex:1;font-size:12px;padding:9px 13px;border-radius:4px;border:1px solid var(--gray3);background:#fff;outline:none;color:var(--text);transition:border .15s}
+.cinput input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(26,107,172,0.1)}
+.cbtn{background:var(--navy);color:#fff;border:none;padding:9px 18px;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s}
+.cbtn:hover{background:var(--navy2)}
+.cbtn:disabled{opacity:.5;cursor:not-allowed}
+.intent-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.ichip{background:var(--gray1);border:1px solid var(--gray3);border-radius:20px;padding:4px 10px;font-size:10px;color:var(--gray5);cursor:pointer;transition:all .15s;font-weight:600}
+.ichip:hover{background:var(--accent2);color:var(--accent);border-color:#bad6f4}
+/* REPORTS */
+.rp-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.rp-card{background:#fff;border:1px solid var(--border);border-radius:6px;padding:18px;text-align:center;transition:box-shadow .2s,transform .2s}
+.rp-card:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
+.rp-icon{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:20px}
+.rp-title{font-size:13px;font-weight:800;color:var(--text);margin-bottom:5px}
+.rp-desc{font-size:10.5px;color:var(--gray4);margin-bottom:12px;line-height:1.5}
+.rp-btn{font-size:10px;font-weight:800;padding:7px 16px;background:var(--navy);color:#fff;border:none;border-radius:4px;cursor:pointer;letter-spacing:.5px;text-transform:uppercase;transition:background .15s}
+.rp-btn:hover{background:var(--navy2)}
+.rp-btn.loading{background:var(--gray4);cursor:not-allowed}
+/* TOAST */
+.toast-wrap{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:1000;pointer-events:none}
+.toast{background:var(--navy);color:#fff;padding:10px 16px;border-radius:6px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,0.2);animation:toastin .3s ease;pointer-events:none}
+@keyframes toastin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.toast.out{animation:toastout .3s ease forwards}
+@keyframes toastout{to{opacity:0;transform:translateY(10px)}}
+.toast-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+/* DIVIDER */
+.sec-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.9px;color:var(--gray4);margin:14px 0 10px}
+/* LGND */
+.lgd{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px}
+.lgd-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--gray5);font-weight:600}
+.lgd-sq{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+/* REFRESH FLASH */
+.flash{animation:flashbg .6s ease}
+@keyframes flashbg{0%{background:#e8f2fb}100%{background:#fff}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sb">
+    <div class="sb-head">
+      <div class="sb-logo">
+        <div class="sb-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="white" stroke-width="1.5"/><path d="M5 11l3-3 2 2 3-4" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div><div class="sb-brand">Retention AI</div><div class="sb-sub">Decision Intel</div></div>
+      </div>
+    </div>
+    <div class="sb-section">Analytics</div>
+    <div class="nav on" onclick="sw('ov',this)"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1" fill="white" opacity=".8"/><rect x="9" y="1" width="6" height="6" rx="1" fill="white" opacity=".8"/><rect x="1" y="9" width="6" height="6" rx="1" fill="white" opacity=".8"/><rect x="9" y="9" width="6" height="6" rx="1" fill="white" opacity=".8"/></svg>Executive overview</div>
+    <div class="nav" onclick="sw('rx',this)"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke="white" stroke-width="1.4"/><path d="M8 5v4" stroke="white" stroke-width="1.4"/><circle cx="8" cy="11.5" r=".9" fill="white"/></svg>Risk explorer<span class="nav-badge" id="nb-risk">1,510</span></div>
+    <div class="nav" onclick="sw('ml',this)"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><polyline points="1,13 5,8 8,10 12,4 15,6" stroke="white" stroke-width="1.4" fill="none"/></svg>Churn prediction</div>
+    <div class="nav" onclick="sw('nb',this)"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><path d="M8 2l1.6 3.3 3.6.5-2.6 2.5.6 3.7L8 10.5l-3.2 1.5.6-3.7L2.8 5.8l3.6-.5z" stroke="white" stroke-width="1.3" fill="none"/></svg>Next best actions</div>
+    <div class="sb-section">Engagement</div>
+    <div class="nav" onclick="sw('ag',this)"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="9" rx="1.8" stroke="white" stroke-width="1.3"/><circle cx="5.5" cy="7.5" r="1" fill="white"/><circle cx="10.5" cy="7.5" r="1" fill="white"/></svg>AI agent</div>
+    <div class="nav" onclick="sw('rp',this)"><svg width="14" height="14" fill="none" viewBox="0 0 16 16"><rect x="2.5" y="1" width="9" height="13" rx="1.5" stroke="white" stroke-width="1.3"/><line x1="5" y1="4.5" x2="9" y2="4.5" stroke="white" stroke-width="1.2"/><line x1="5" y1="7" x2="10" y2="7" stroke="white" stroke-width="1.2"/><line x1="5" y1="9.5" x2="8" y2="9.5" stroke="white" stroke-width="1.2"/></svg>Reports</div>
+    <div class="sb-footer"><div class="sb-live"><span class="live-dot"></span>Live feed active</div><div class="sb-time" id="clock">--:--:--</div></div>
+  </div>
+  <div class="content">
+    <div class="topbar">
+      <div class="tb-left">
+        <div>
+          <div class="tb-title" id="pg-title">Executive overview</div>
+          <div class="tb-subtitle" id="pg-sub">Customer retention intelligence · Q2 2026</div>
+        </div>
+      </div>
+      <div class="tb-right">
+        <span class="chip live" id="live-chip">● Live</span>
+        <span class="chip warn" id="alert-chip">⚠ 898 at-risk accounts</span>
+        <span class="chip" id="refresh-chip">Auto-refresh: 15s</span>
+        <button class="tb-btn" onclick="manualRefresh()">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="main" id="main">
+
+      <!-- OVERVIEW -->
+      <div id="pg-ov" class="pg on">
+        <div class="kstrip">
+          <div class="kcard" id="k0"><div class="kcard-accent" style="background:var(--accent)"></div><div class="klabel">Total customers</div><div class="knum" data-target="5000" data-prefix="">0</div><div class="kdelta up">↑ +3.2% vs last quarter</div></div>
+          <div class="kcard" id="k1"><div class="kcard-accent" style="background:var(--red)"></div><div class="klabel">Churn rate</div><div class="knum" id="churn-kpi">0%</div><div class="kdelta dn" id="churn-delta">↑ +1.1pp vs last quarter</div></div>
+          <div class="kcard" id="k2"><div class="kcard-accent" style="background:var(--green)"></div><div class="klabel">Avg CLV</div><div class="knum" data-target="126" data-prefix="$" data-suffix="K">0</div><div class="kdelta up">↑ +0.8% MoM</div></div>
+          <div class="kcard" id="k3"><div class="kcard-accent" style="background:var(--amber)"></div><div class="klabel">Revenue at risk</div><div class="knum" data-target="135" data-prefix="$" data-suffix="M">0</div><div class="kdelta dn">↑ High exposure</div></div>
+        </div>
+        <div class="kstrip kstrip2">
+          <div class="kcard"><div class="klabel">Avg risk score</div><div class="knum" style="font-size:18px" data-target="265" data-prefix="0." data-nodot="1">0</div></div>
+          <div class="kcard"><div class="klabel">Avg satisfaction</div><div class="knum" style="font-size:18px" id="sat-kpi">8.54<span style="font-size:12px;color:var(--gray4)">/10</span></div></div>
+          <div class="kcard"><div class="klabel">High-risk accounts</div><div class="knum" style="font-size:18px;color:var(--red)" data-target="1510">0</div></div>
+          <div class="kcard"><div class="klabel">Recovery potential</div><div class="knum" style="font-size:18px;color:var(--green)" data-target="89" data-prefix="$" data-suffix="M">0</div></div>
+        </div>
+        <div class="row2" style="margin-top:12px">
+          <div class="panel">
+            <div class="ptitle">Churn rate by region<span class="ptitle-right" onclick="showToast('Drill-down: region view')">View detail →</span></div>
+            <div style="position:relative;height:175px"><canvas id="c1" role="img" aria-label="Churn by region bar chart">South 24.1%, East 21.0%, West 20.3%, North 19.8%</canvas></div>
+          </div>
+          <div class="panel">
+            <div class="ptitle">Churn by segment<span class="ptitle-right" onclick="showToast('Drill-down: segment view')">View detail →</span></div>
+            <div class="lgd">
+              <div class="lgd-item"><div class="lgd-sq" style="background:#1a6bac"></div>Premium 18%</div>
+              <div class="lgd-item"><div class="lgd-sq" style="background:#5a6472"></div>Standard 23%</div>
+              <div class="lgd-item"><div class="lgd-sq" style="background:#c0392b"></div>Basic 28%</div>
+            </div>
+            <div style="position:relative;height:140px"><canvas id="c2" role="img" aria-label="Churn by segment donut">Premium 18%, Standard 23%, Basic 28%</canvas></div>
+          </div>
+        </div>
+        <div class="sec-title">Regional churn benchmarks</div>
+        <div class="row2">
+          <div class="panel" id="prog-panel1">
+            <div class="prog-row"><span class="prog-lbl">South</span><div class="prog-bg"><div class="prog-fill" style="background:var(--red)" data-w="80"></div></div><span class="prog-val" style="color:var(--red)">24.1%</span></div>
+            <div class="prog-row"><span class="prog-lbl">East</span><div class="prog-bg"><div class="prog-fill" style="background:var(--amber)" data-w="70"></div></div><span class="prog-val" style="color:var(--amber)">21.0%</span></div>
+            <div class="prog-row"><span class="prog-lbl">West</span><div class="prog-bg"><div class="prog-fill" style="background:var(--accent)" data-w="67"></div></div><span class="prog-val" style="color:var(--accent)">20.3%</span></div>
+            <div class="prog-row"><span class="prog-lbl">North</span><div class="prog-bg"><div class="prog-fill" style="background:var(--green)" data-w="66"></div></div><span class="prog-val" style="color:var(--green)">19.8%</span></div>
+          </div>
+          <div class="panel">
+            <div class="prog-row"><span class="prog-lbl">Premium plan</span><div class="prog-bg"><div class="prog-fill" style="background:var(--green)" data-w="60"></div></div><span class="prog-val" style="color:var(--green)">18.0%</span></div>
+            <div class="prog-row"><span class="prog-lbl">Standard plan</span><div class="prog-bg"><div class="prog-fill" style="background:var(--amber)" data-w="75"></div></div><span class="prog-val" style="color:var(--amber)">23.0%</span></div>
+            <div class="prog-row"><span class="prog-lbl">Basic plan</span><div class="prog-bg"><div class="prog-fill" style="background:var(--red)" data-w="92"></div></div><span class="prog-val" style="color:var(--red)">28.0%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RISK EXPLORER -->
+      <div id="pg-rx" class="pg">
+        <div class="kstrip">
+          <div class="kcard"><div class="kcard-accent" style="background:var(--red)"></div><div class="klabel">High risk (≥ 0.65)</div><div class="knum" style="color:var(--red)">1,510</div><div class="kdelta dn">30.2% of base</div></div>
+          <div class="kcard"><div class="kcard-accent" style="background:var(--amber)"></div><div class="klabel">Medium risk</div><div class="knum" style="color:var(--amber)">1,840</div><div class="kdelta">36.8% of base</div></div>
+          <div class="kcard"><div class="kcard-accent" style="background:var(--green)"></div><div class="klabel">Low risk (&lt; 0.35)</div><div class="knum" style="color:var(--green)">1,650</div><div class="kdelta up">33.0% of base</div></div>
+          <div class="kcard"><div class="kcard-accent" style="background:var(--accent)"></div><div class="klabel">Avg risk score</div><div class="knum">0.265</div></div>
+        </div>
+        <div class="frow">
+          <select id="f-region" onchange="filterTable()"><option value="">All regions</option><option>South</option><option>North</option><option>East</option><option>West</option></select>
+          <select id="f-seg" onchange="filterTable()"><option value="">All segments</option><option>Premium</option><option>Standard</option><option>Basic</option></select>
+          <select id="f-risk" onchange="filterTable()"><option value="">All risk levels</option><option value="High">High only</option><option value="Medium">Medium only</option><option value="Low">Low only</option></select>
+          <input id="f-search" placeholder="Search name or ID..." oninput="filterTable()">
+          <span class="fcount" id="tbl-count">Showing 8 of 5,000</span>
+        </div>
+        <div class="tbl-wrap" style="max-height:340px;overflow-y:auto">
+          <table class="tbl">
+            <thead><tr><th>Customer ID</th><th>Name</th><th>Segment</th><th>Region</th><th>CLV</th><th>Risk score</th><th>Sat.</th><th>Next best action</th><th>Risk</th></tr></thead>
+            <tbody id="risk-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CHURN PREDICTION -->
+      <div id="pg-ml" class="pg">
+        <div class="mcards">
+          <div class="mcard"><div class="mname">Logistic Regression</div><div class="mrow">Accuracy<span class="mval">78.4%</span></div><div class="mrow">Precision<span class="mval">0.76</span></div><div class="mrow">Recall<span class="mval">0.72</span></div><div class="mrow">F1 score<span class="mval">0.74</span></div><div class="mrow">ROC-AUC<span class="mval">0.81</span></div></div>
+          <div class="mcard"><div class="mname">Random Forest</div><div class="mrow">Accuracy<span class="mval">83.1%</span></div><div class="mrow">Precision<span class="mval">0.82</span></div><div class="mrow">Recall<span class="mval">0.78</span></div><div class="mrow">F1 score<span class="mval">0.80</span></div><div class="mrow">ROC-AUC<span class="mval">0.88</span></div></div>
+          <div class="mcard best"><div class="mbadge">✓ Best model — auto-selected</div><div class="mname">XGBoost</div><div class="mrow">Accuracy<span class="mval">85.6%</span></div><div class="mrow">Precision<span class="mval">0.84</span></div><div class="mrow">Recall<span class="mval">0.82</span></div><div class="mrow">F1 score<span class="mval">0.83</span></div><div class="mrow">ROC-AUC<span class="mval">0.91</span></div></div>
+        </div>
+        <div class="row2">
+          <div class="panel">
+            <div class="ptitle">Feature importance — XGBoost</div>
+            <div id="feat-bars">
+              <div class="fbar-row"><span class="fbar-lbl">Payment delay days</span><div class="fbar-bg"><div class="fbar-fill" data-w="92"></div></div><span class="fbar-pct">0.28</span></div>
+              <div class="fbar-row"><span class="fbar-lbl">Support tickets</span><div class="fbar-bg"><div class="fbar-fill" data-w="76"></div></div><span class="fbar-pct">0.22</span></div>
+              <div class="fbar-row"><span class="fbar-lbl">Tenure months</span><div class="fbar-bg"><div class="fbar-fill" data-w="62"></div></div><span class="fbar-pct">0.18</span></div>
+              <div class="fbar-row"><span class="fbar-lbl">Monthly charges</span><div class="fbar-bg"><div class="fbar-fill" data-w="50"></div></div><span class="fbar-pct">0.15</span></div>
+              <div class="fbar-row"><span class="fbar-lbl">Satisfaction score</span><div class="fbar-bg"><div class="fbar-fill" data-w="38"></div></div><span class="fbar-pct">0.11</span></div>
+              <div class="fbar-row"><span class="fbar-lbl">Plan type</span><div class="fbar-bg"><div class="fbar-fill" data-w="20"></div></div><span class="fbar-pct">0.06</span></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="ptitle">ROC curve — XGBoost (AUC = 0.91)</div>
+            <div style="position:relative;height:200px"><canvas id="c3" role="img" aria-label="ROC curve, XGBoost AUC 0.91">AUC = 0.91</canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NBA -->
+      <div id="pg-nb" class="pg">
+        <div class="kstrip">
+          <div class="kcard"><div class="kcard-accent" style="background:var(--red)"></div><div class="klabel">Premium offer</div><div class="knum" style="color:var(--red)">898</div><div class="kdelta">CLV ≥ 75th pct</div></div>
+          <div class="kcard"><div class="kcard-accent" style="background:var(--amber)"></div><div class="klabel">Service recovery</div><div class="knum" style="color:var(--amber)">612</div><div class="kdelta">3+ complaints</div></div>
+          <div class="kcard"><div class="kcard-accent" style="background:var(--accent)"></div><div class="klabel">Upsell</div><div class="knum" style="color:var(--accent)">1,201</div><div class="kdelta">upsell prob ≥ 65%</div></div>
+          <div class="kcard"><div class="kcard-accent" style="background:var(--gray4)"></div><div class="klabel">Monitor</div><div class="knum">1,589</div><div class="kdelta">low risk</div></div>
+        </div>
+        <div class="row2" style="margin-bottom:12px">
+          <div class="panel">
+            <div class="ptitle">Strategy distribution</div>
+            <div class="lgd">
+              <div class="lgd-item"><div class="lgd-sq" style="background:#c0392b"></div>Premium offer 18%</div>
+              <div class="lgd-item"><div class="lgd-sq" style="background:#b45309"></div>Svc recovery 12%</div>
+              <div class="lgd-item"><div class="lgd-sq" style="background:#1a6bac"></div>Upsell 24%</div>
+              <div class="lgd-item"><div class="lgd-sq" style="background:#1a7a4a"></div>Monitor 32%</div>
+              <div class="lgd-item"><div class="lgd-sq" style="background:#5a6472"></div>Other 14%</div>
+            </div>
+            <div style="position:relative;height:155px"><canvas id="c4" role="img" aria-label="Strategy distribution donut">Premium 18%, Service recovery 12%, Upsell 24%, Monitor 32%, Other 14%</canvas></div>
+          </div>
+          <div class="panel">
+            <div class="ptitle">Revenue protected by strategy ($M)</div>
+            <div style="position:relative;height:180px"><canvas id="c5" role="img" aria-label="Revenue protected bar chart">Premium $58M, Service recovery $31M, Upsell $19M, Payment $12M, CX $8M</canvas></div>
+          </div>
+        </div>
+        <div class="rcards">
+          <div class="rcard r1"><div class="rc-count" style="color:var(--red)">898 customers</div><div class="rc-title">Premium retention offer</div><div class="rc-meta">Avg CLV $184K · churn ≥ 65% · CLV ≥ 75th percentile · est. $58M protected</div></div>
+          <div class="rcard r2"><div class="rc-count" style="color:var(--amber)">612 customers</div><div class="rc-title">Service recovery call</div><div class="rc-meta">3+ complaints in 90 days · churn ≥ 65% · est. $31M protected</div></div>
+          <div class="rcard r3"><div class="rc-count" style="color:var(--accent)">1,201 customers</div><div class="rc-title">Upsell to premium</div><div class="rc-meta">Standard plan · churn &lt; 35% · upsell probability ≥ 65%</div></div>
+          <div class="rcard r4"><div class="rc-count" style="color:var(--green)">1,589 customers</div><div class="rc-title">Monitor</div><div class="rc-meta">No immediate action · low churn risk baseline · standard outreach</div></div>
+        </div>
+      </div>
+
+      <!-- AGENT -->
+      <div id="pg-ag" class="pg">
+        <div class="kstrip" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+          <div class="kcard"><div class="klabel">Intents supported</div><div class="knum">9</div><div class="kdelta up">No API key required</div></div>
+          <div class="kcard"><div class="klabel">Response latency</div><div class="knum">&lt;50ms</div><div class="kdelta up">Deterministic routing</div></div>
+          <div class="kcard"><div class="klabel">Queries answered</div><div class="knum" id="query-count">0</div><div class="kdelta up">This session</div></div>
+        </div>
+        <div style="margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:6px">Quick prompts</div>
+          <div class="intent-chips">
+            <div class="ichip" onclick="sendMsg('What is the overall churn rate?')">Churn rate?</div>
+            <div class="ichip" onclick="sendMsg('Which region has the worst churn?')">Region analysis</div>
+            <div class="ichip" onclick="sendMsg('Show most at-risk customers')">High-risk list</div>
+            <div class="ichip" onclick="sendMsg('How much revenue are we losing?')">Revenue at risk</div>
+            <div class="ichip" onclick="sendMsg('What retention strategies should we use?')">NBA strategies</div>
+            <div class="ichip" onclick="sendMsg('Give me a full KPI summary')">KPI summary</div>
+            <div class="ichip" onclick="sendMsg('Are there any data quality issues?')">Data quality</div>
+          </div>
+        </div>
+        <div class="chat-box" id="chat-box"></div>
+        <div class="cinput">
+          <input id="chat-input" placeholder="Ask any retention question in plain English..." onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="cbtn" id="chat-btn" onclick="sendChat()">Ask agent →</button>
+        </div>
+      </div>
+
+      <!-- REPORTS -->
+      <div id="pg-rp" class="pg">
+        <div class="rp-cards">
+          <div class="rp-card"><div class="rp-icon" style="background:var(--green2)">📄</div><div class="rp-title">Executive PDF</div><div class="rp-desc">KPIs, churn trends, risk heatmap, NBA summary. 8-page board-ready document.</div><button class="rp-btn" onclick="genReport(this,'PDF')">Generate PDF</button></div>
+          <div class="rp-card"><div class="rp-icon" style="background:var(--accent2)">📊</div><div class="rp-title">Customer CSV</div><div class="rp-desc">Full 5,000-row scored customer list with NBA actions. CRM-ready.</div><button class="rp-btn" onclick="genReport(this,'CSV')">Export CSV</button></div>
+          <div class="rp-card"><div class="rp-icon" style="background:var(--amber2)">📑</div><div class="rp-title">PowerPoint deck</div><div class="rp-desc">10-slide executive presentation with charts and talking points.</div><button class="rp-btn" onclick="genReport(this,'PPT')">Generate PPT</button></div>
+        </div>
+        <div class="sec-title">Recent exports</div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Filename</th><th>Type</th><th>Generated</th><th>Size</th><th>Status</th></tr></thead>
+            <tbody id="report-tbody">
+              <tr><td>retention_executive_apr2026.pdf</td><td>PDF</td><td>Just now</td><td>1.2 MB</td><td><span class="tag tag-l">Ready</span></td></tr>
+              <tr><td>customer_actions_apr2026.csv</td><td>CSV</td><td>2 min ago</td><td>340 KB</td><td><span class="tag tag-l">Ready</span></td></tr>
+              <tr><td>exec_deck_q2_2026.pptx</td><td>PPT</td><td>15 min ago</td><td>2.8 MB</td><td><span class="tag tag-l">Ready</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+// ── PAGE NAV ──
+const pages={ov:"Executive overview",rx:"Risk explorer",ml:"Churn prediction",nb:"Next best actions",ag:"AI agent",rp:"Reports"};
+const subs={ov:"Customer retention intelligence · Q2 2026",rx:"Search and drill into 5,000 customer risk profiles",ml:"Model comparison · XGBoost selected (AUC 0.91)",nb:"Rule-based NBA engine · 6 priority rules",ag:"Natural language interface · no API key required",rp:"One-click PDF, CSV, and PowerPoint generation"};
+function sw(id,el){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nav').forEach(n=>n.classList.remove('on'));
+  document.getElementById('pg-'+id).classList.add('on');
+  el.classList.add('on');
+  document.getElementById('pg-title').textContent=pages[id];
+  document.getElementById('pg-sub').textContent=subs[id];
+  if(id==='ml') animateBars('#feat-bars .fbar-fill');
+  if(id==='ov') animateProgBars();
+}
+
+// ── CLOCK ──
+function tick(){const n=new Date();document.getElementById('clock').textContent=n.toLocaleTimeString('en-GB')}
+tick();setInterval(tick,1000);
+
+// ── ANIMATED COUNTERS ──
+function animateCounter(el,target,prefix='',suffix=''){
+  const dur=1200,step=16,steps=dur/step;
+  let cur=0,frame=0;
+  const t=setInterval(()=>{
+    frame++;
+    cur=Math.round(target*(frame/steps));
+    if(frame>=steps){cur=target;clearInterval(t)}
+    const val=prefix+(cur>=1000?cur.toLocaleString():cur)+(suffix||'');
+    el.textContent=val;
+  },step);
+}
+function initCounters(){
+  document.querySelectorAll('[data-target]').forEach(el=>{
+    const t=+el.dataset.target,pre=el.dataset.prefix||'',suf=el.dataset.suffix||'';
+    animateCounter(el,t,pre,suf);
+  });
+  // churn rate special
+  let cr=0;const cInt=setInterval(()=>{
+    cr=Math.min(cr+0.5,21.3);
+    document.getElementById('churn-kpi').textContent=cr.toFixed(1)+'%';
+    if(cr>=21.3)clearInterval(cInt);
+  },30);
+}
+window.addEventListener('load',()=>{initCounters();animateProgBars();initCharts();buildRiskTable();initChat();});
+
+// ── PROG BARS ──
+function animateProgBars(){
+  setTimeout(()=>{
+    document.querySelectorAll('.prog-fill[data-w]').forEach(el=>{
+      el.style.width=el.dataset.w+'%';
+    });
+  },200);
+}
+
+// ── CHARTS ──
+let charts={};
+function initCharts(){
+  const tc='rgba(0,0,0,0.38)',gc='rgba(0,0,0,0.05)';
+  const base={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}};
+
+  charts.c1=new Chart(document.getElementById('c1'),{type:'bar',data:{labels:['South','North','East','West'],
+    datasets:[{data:[24.1,19.8,21.0,20.3],backgroundColor:['#c0392b','#1a7a4a','#b45309','#1a6bac'],borderRadius:4,barPercentage:.6}]},
+    options:{...base,animation:{duration:1000,easing:'easeOutQuart'},
+      scales:{x:{ticks:{color:tc,font:{size:10}},grid:{color:gc}},y:{ticks:{color:tc,font:{size:10},callback:v=>v+'%'},grid:{color:gc},max:30,min:15}}}});
+
+  charts.c2=new Chart(document.getElementById('c2'),{type:'doughnut',data:{labels:['Premium','Standard','Basic'],
+    datasets:[{data:[18,23,28],backgroundColor:['#1a6bac','#5a6472','#c0392b'],borderWidth:3,borderColor:'#fff'}]},
+    options:{...base,animation:{animateRotate:true,duration:1200},cutout:'65%'}});
+
+  charts.c3=new Chart(document.getElementById('c3'),{type:'line',
+    data:{labels:[0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1],
+      datasets:[{label:'XGBoost AUC=0.91',data:[0,.35,.58,.72,.81,.87,.91,.94,.96,.98,1],borderColor:'#1a6bac',backgroundColor:'rgba(26,107,172,0.07)',fill:true,tension:.4,borderWidth:2,pointRadius:0},
+      {label:'Random baseline',data:[0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1],borderColor:'#ccc',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}]},
+    options:{...base,animation:{duration:1400},plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:10},color:tc}}},
+      scales:{x:{ticks:{color:tc,font:{size:9}},grid:{color:gc},title:{display:true,text:'False positive rate',font:{size:9},color:tc}},
+        y:{ticks:{color:tc,font:{size:9}},grid:{color:gc},title:{display:true,text:'True positive rate',font:{size:9},color:tc}}}}});
+
+  charts.c4=new Chart(document.getElementById('c4'),{type:'doughnut',
+    data:{labels:['Premium offer','Svc recovery','Payment support','Upsell','CX','Monitor'],
+      datasets:[{data:[18,12,5,24,9,32],backgroundColor:['#c0392b','#b45309','#7b1a1a','#1a6bac','#854F0B','#5a6472'],borderWidth:3,borderColor:'#fff'}]},
+    options:{...base,animation:{animateRotate:true,duration:1200},cutout:'58%'}});
+
+  charts.c5=new Chart(document.getElementById('c5'),{type:'bar',
+    data:{labels:['Premium offer','Svc recovery','Upsell','Payment','CX'],
+      datasets:[{data:[58,31,19,12,8],backgroundColor:'#1a6bac',borderRadius:4,barPercentage:.6}]},
+    options:{...base,animation:{duration:1000,easing:'easeOutQuart'},
+      scales:{x:{ticks:{color:tc,font:{size:9}},grid:{color:gc}},
+        y:{ticks:{color:tc,font:{size:10},callback:v=>'$'+v+'M'},grid:{color:gc}}}}});
+}
+
+function animateBars(sel){
+  setTimeout(()=>{
+    document.querySelectorAll(sel).forEach(el=>{el.style.width=(el.dataset.w||0)+'%';});
+  },100);
+}
+
+// ── RISK TABLE DATA ──
+const customers=[
+  {id:'C-1042',name:'Aarav Sharma',seg:'Premium',region:'South',clv:'$182,400',score:0.81,sat:3.2,nba:'Retention offer',risk:'High'},
+  {id:'C-2891',name:'Li Wei',seg:'Standard',region:'South',clv:'$94,200',score:0.74,sat:4.8,nba:'Service recovery',risk:'High'},
+  {id:'C-0374',name:'Priya Patel',seg:'Basic',region:'East',clv:'$41,000',score:0.68,sat:5.1,nba:'Payment support',risk:'High'},
+  {id:'C-3310',name:'Omar Hassan',seg:'Premium',region:'West',clv:'$210,600',score:0.52,sat:6.3,nba:'CX Intervention',risk:'Medium'},
+  {id:'C-4107',name:'Sofia Müller',seg:'Standard',region:'North',clv:'$78,900',score:0.41,sat:7.0,nba:'Upsell',risk:'Medium'},
+  {id:'C-0889',name:'James Okafor',seg:'Basic',region:'North',clv:'$29,300',score:0.18,sat:8.9,nba:'Monitor',risk:'Low'},
+  {id:'C-2245',name:'Elena Rossi',seg:'Premium',region:'East',clv:'$164,500',score:0.79,sat:3.9,nba:'Retention offer',risk:'High'},
+  {id:'C-3891',name:'Chen Bo',seg:'Standard',region:'South',clv:'$56,100',score:0.31,sat:7.5,nba:'Upsell',risk:'Low'},
+];
+function buildRiskTable(filtered){
+  const data=filtered||customers;
+  const tbody=document.getElementById('risk-tbody');
+  const tagClass={High:'tag-h',Medium:'tag-m',Low:'tag-l'};
+  const scoreColor={High:'var(--red)',Medium:'var(--amber)',Low:'var(--green)'};
+  tbody.innerHTML=data.map(r=>`<tr>
+    <td><b>${r.id}</b></td><td>${r.name}</td>
+    <td><span class="tag tag-b">${r.seg}</span></td><td>${r.region}</td>
+    <td><b>${r.clv}</b></td>
+    <td><b style="color:${scoreColor[r.risk]}">${r.score}</b></td>
+    <td>${r.sat}</td>
+    <td><span class="tag ${tagClass[r.risk]}">${r.nba}</span></td>
+    <td><span class="tag ${tagClass[r.risk]}">${r.risk}</span></td>
+  </tr>`).join('');
+  document.getElementById('tbl-count').textContent=`Showing ${data.length} of 5,000`;
+}
+function filterTable(){
+  const reg=document.getElementById('f-region').value;
+  const seg=document.getElementById('f-seg').value;
+  const risk=document.getElementById('f-risk').value;
+  const q=document.getElementById('f-search').value.toLowerCase();
+  const filtered=customers.filter(r=>
+    (!reg||r.region===reg)&&(!seg||r.seg===seg)&&(!risk||r.risk===risk)&&
+    (!q||r.name.toLowerCase().includes(q)||r.id.toLowerCase().includes(q)));
+  buildRiskTable(filtered);
+}
+
+// ── AGENT CHAT ──
+let queryCount=0;
+const agentResponses={
+  'churn rate':{intent:'churn_rate',text:'Current churn rate is <b>21.3%</b> across 5,000 customers — 1,065 have churned. Revenue at risk totals <b>$135M</b>. South leads at 24.1%. Immediate intervention recommended for 898 high-CLV accounts. <b>Confidence: High</b>'},
+  'region':{intent:'region_analysis',text:'<b>South</b> leads at 24.1% churn, followed by East (21.0%), West (20.3%), and North (19.8%). South contributes ~28% of total revenue at risk ($37.8M). Targeted retention campaigns for South and East are highest priority. <b>Confidence: High</b>'},
+  'revenue':{intent:'revenue_risk',text:'Total revenue at risk: <b>$135M</b>. Breakdown — South $37.8M (28%), East $28.4M (21%), West $27.4M (20%), North $26.7M (20%), unattributed $14.7M (11%). Recovery potential through NBA interventions: <b>$89M</b>. <b>Confidence: High</b>'},
+  'at-risk':{intent:'high_risk',text:'<b>1,510 customers</b> have churn score ≥ 0.65. Top 3: Aarav Sharma (0.81, CLV $182K), Elena Rossi (0.79, CLV $164K), Li Wei (0.74, CLV $94K). Recommended action: Premium Retention Offer for top 898 by CLV. <b>Confidence: High</b>'},
+  'strateg':{intent:'recommend',text:'NBA engine has scored all 5,000 customers. Top strategies: <b>Premium Retention Offer</b> (898 customers, $58M), <b>Service Recovery Call</b> (612 customers, $31M), <b>Upsell</b> (1,201 customers, $19M). Total addressable value: <b>$89M</b>. <b>Confidence: High</b>'},
+  'kpi':{intent:'kpi_summary',text:'KPI snapshot — Customers: <b>5,000</b> | Churn rate: <b>21.3%</b> | Avg CLV: <b>$126K</b> | Revenue at risk: <b>$135M</b> | Avg risk score: <b>0.265</b> | Avg satisfaction: <b>8.54/10</b> | High-risk accounts: <b>1,510</b>. <b>Confidence: High</b>'},
+  'data':{intent:'data_profile',text:'Dataset: 5,000 rows × 12 columns. <b>No critical data quality issues.</b> Null rates all &lt;2%. Derived columns: estimated_clv, churn_risk_score, satisfaction_score, upsell_probability, retention_offer_cost. Source: 01_Customer_Retention.csv. <b>Confidence: High</b>'},
+};
+function getResponse(msg){
+  const m=msg.toLowerCase();
+  if(m.includes('churn rate')||m.includes('overall churn')) return agentResponses['churn rate'];
+  if(m.includes('region')) return agentResponses['region'];
+  if(m.includes('revenue')||m.includes('losing')) return agentResponses['revenue'];
+  if(m.includes('risk')||m.includes('at-risk')) return agentResponses['at-risk'];
+  if(m.includes('strateg')||m.includes('retention')||m.includes('nba')) return agentResponses['strateg'];
+  if(m.includes('kpi')||m.includes('summary')||m.includes('dashboard')) return agentResponses['kpi'];
+  if(m.includes('data')||m.includes('quality')) return agentResponses['data'];
+  return {intent:'unknown',text:`I classified your query as an analytics request. Based on current data: churn rate is <b>21.3%</b>, revenue at risk is <b>$135M</b>, and 1,510 customers are high-risk. Try asking about churn rate, region analysis, or revenue at risk for more specific insights.`};
+}
+function initChat(){
+  addBubble('ba','<div class="ba-head">Retention AI · ready</div>I have full context on your 5,000 customers. Ask me about churn rate, regional performance, revenue at risk, high-risk accounts, or NBA strategies. Use the quick prompts above to get started.');
+}
+function addBubble(cls,html){
+  const box=document.getElementById('chat-box');
+  const d=document.createElement('div');
+  d.className='bubble '+cls;d.innerHTML=html;
+  box.appendChild(d);box.scrollTop=box.scrollHeight;
+}
+function sendMsg(text){document.getElementById('chat-input').value=text;sendChat();}
+function sendChat(){
+  const inp=document.getElementById('chat-input');
+  const msg=inp.value.trim();if(!msg)return;
+  const btn=document.getElementById('chat-btn');
+  addBubble('bu',msg);inp.value='';btn.disabled=true;
+  // typing indicator
+  const box=document.getElementById('chat-box');
+  const typing=document.createElement('div');
+  typing.className='typing';typing.innerHTML='<span></span><span></span><span></span>';
+  box.appendChild(typing);box.scrollTop=box.scrollHeight;
+  setTimeout(()=>{
+    box.removeChild(typing);
+    const res=getResponse(msg);
+    addBubble('ba',`<div class="ba-head">${res.intent} intent · rule-based router</div>${res.text}`);
+    queryCount++;
+    document.getElementById('query-count').textContent=queryCount;
+    btn.disabled=false;
+  },900+Math.random()*400);
+}
+
+// ── LIVE REFRESH ──
+let refreshTimer=15;
+function tick2(){
+  refreshTimer--;
+  document.getElementById('refresh-chip').textContent='Auto-refresh: '+refreshTimer+'s';
+  if(refreshTimer<=0){liveRefresh();refreshTimer=15;}
+}
+setInterval(tick2,1000);
+
+function liveRefresh(){
+  // Slightly vary churn rate ±0.1
+  const base=21.3,delta=(Math.random()-.5)*.2;
+  const newRate=(base+delta).toFixed(1);
+  document.getElementById('churn-kpi').textContent=newRate+'%';
+  // Flash kpi cards
+  ['k0','k1','k2','k3'].forEach(id=>{const k=document.getElementById(id);k.classList.add('flash');setTimeout(()=>k.classList.remove('flash'),700);});
+  showToast('Data refreshed · '+new Date().toLocaleTimeString('en-GB'));
+  // Update chart data slightly
+  if(charts.c1){
+    charts.c1.data.datasets[0].data=charts.c1.data.datasets[0].data.map(v=>+(v+(Math.random()-.5)*.3).toFixed(1));
+    charts.c1.update('none');
+  }
+}
+function manualRefresh(){liveRefresh();refreshTimer=15;}
+
+// ── TOAST ──
+function showToast(msg,color='#0a2342'){
+  const wrap=document.getElementById('toast-wrap');
+  const t=document.createElement('div');
+  t.className='toast';
+  t.innerHTML=`<span class="toast-dot" style="background:#22c55e"></span>${msg}`;
+  wrap.appendChild(t);
+  setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),350);},2800);
+}
+
+// ── REPORT GEN ──
+function genReport(btn,type){
+  btn.textContent='Generating...';btn.classList.add('loading');
+  setTimeout(()=>{
+    btn.textContent=type+' ready ✓';btn.style.background='var(--green)';
+    showToast(type+' generated successfully');
+    const now=new Date();
+    const tbody=document.getElementById('report-tbody');
+    const fnames={PDF:'retention_exec_'+Date.now()+'.pdf',CSV:'customer_actions_'+Date.now()+'.csv',PPT:'exec_deck_'+Date.now()+'.pptx'};
+    const sizes={PDF:'1.2 MB',CSV:'340 KB',PPT:'2.8 MB'};
+    const row=document.createElement('tr');
+    row.innerHTML=`<td>${fnames[type]}</td><td>${type}</td><td>Just now</td><td>${sizes[type]}</td><td><span class="tag tag-l">Ready</span></td>`;
+    tbody.insertBefore(row,tbody.firstChild);
+    setTimeout(()=>{btn.textContent='Generate '+type;btn.classList.remove('loading');btn.style.background='';},3000);
+  },2200);
+}
+</script>
+</body>
+</html>

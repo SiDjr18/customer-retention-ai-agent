@@ -2,9 +2,11 @@
 Report generation routes.
 
 Endpoints:
-  POST /reports/pdf  — PDF executive report (reportlab)
-  POST /reports/csv  — CSV customer action list
-  POST /reports/ppt  — PowerPoint summary (python-pptx) or Markdown fallback
+  POST /reports/pdf      — PDF executive report (reportlab)
+  POST /reports/csv      — CSV customer action list
+  POST /reports/ppt      — PowerPoint summary (python-pptx) or Markdown fallback
+  POST /reports/markdown — Structured Markdown executive report (no extra deps)
+  GET  /reports/export/{filename} — download any generated report
 """
 
 from fastapi import APIRouter, HTTPException
@@ -51,6 +53,36 @@ async def generate_ppt(body: ReportRequest) -> ReportResponse:
     """
     try:
         return get_service().generate_ppt(body)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post(
+    "/markdown",
+    response_model=ReportResponse,
+    summary="Generate structured Markdown executive report",
+    tags=["Reports"],
+)
+async def generate_markdown(body: ReportRequest) -> ReportResponse:
+    """
+    Generate a 6-section business-readable Markdown report:
+
+    1. Executive Summary — from KPI insight or executive_note
+    2. Current State — churn rate, revenue at risk, core KPIs
+    3. Key Insights — top 3 drivers from the decision engine
+    4. Financial Impact — revenue at risk (risk > 0.6), high-value customers
+    5. Recommended Actions — top 3 from the priority list
+    6. Expected Outcome — derived recovery estimate with confidence level
+
+    No extra dependencies. Report saved to /reports/ and returned as a download path.
+    """
+    try:
+        return get_service().generate_markdown_report(body)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Dataset not available — cannot generate report: {exc}",
+        ) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

@@ -24,14 +24,15 @@ export const fetchSample  = (n = 50) => client.get(`/dataset/sample?n=${n}`).the
 export const filterDataset = (body)  => client.post('/dataset/filter', body).then(r => r.data)
 
 // ── Predictions ───────────────────────────────────────────────────────────────
-export const predictChurn     = (body) => client.post('/predict/churn', body).then(r => r.data)
-export const predictBatch     = (body) => client.post('/predict/batch', body).then(r => r.data)
-export const fetchModelMetrics = ()    => client.get('/predict/metrics').then(r => r.data)
+export const predictChurn      = (body) => client.post('/predict/churn', body).then(r => r.data)
+export const predictBatch      = (body) => client.post('/predict/batch', body).then(r => r.data)
+export const fetchModelMetrics = ()     => client.get('/predict/metrics').then(r => r.data)
 
 // ── Recommendations ───────────────────────────────────────────────────────────
-export const recommendCustomer  = (body) => client.post('/recommend/customer', body).then(r => r.data)
-export const recommendBatch     = (body) => client.post('/recommend/batch', body).then(r => r.data)
-export const fetchStrategySummary = ()   => client.get('/recommend/strategy-summary').then(r => r.data)
+export const recommendCustomer    = (body) => client.post('/recommend/customer', body).then(r => r.data)
+export const recommendBatch       = (body) => client.post('/recommend/batch', body).then(r => r.data)
+export const fetchStrategySummary = ()     => client.get('/recommend/strategy-summary').then(r => r.data)
+export const fetchPriorityList    = (n=10) => client.get(`/recommend/priority-list?top_n=${n}`).then(r => r.data)
 
 // ── Agent ─────────────────────────────────────────────────────────────────────
 export const agentChat = (message, context = null) =>

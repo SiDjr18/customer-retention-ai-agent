@@ -12,21 +12,14 @@ from pydantic import BaseModel, Field
 # Single prediction
 # ---------------------------------------------------------------------------
 class ChurnPredictRequest(BaseModel):
-    """Raw feature values for a single customer record."""
-
-    # Demographics / geography
     customer_id: Optional[str] = None
     region: Optional[str] = None
     state: Optional[str] = None
     city_tier: Optional[str] = None
-
-    # Commercial
     customer_segment: Optional[str] = None
     plan_type: Optional[str] = None
     contract_type: Optional[str] = None
     acquisition_channel: Optional[str] = None
-
-    # Behavioural / financial signals
     tenure_months: Optional[float] = None
     monthly_charges: Optional[float] = None
     total_charges: Optional[float] = None
@@ -38,8 +31,6 @@ class ChurnPredictRequest(BaseModel):
     payment_failures_12m: Optional[int] = None
     support_tickets_12m: Optional[int] = None
     retention_offer_cost: Optional[float] = None
-
-    # Allow extra fields so partial records don't fail
     model_config = {"extra": "allow"}
 
 
@@ -56,6 +47,7 @@ class ChurnPredictResponse(BaseModel):
     risk_label: str  # "High" | "Medium" | "Low"
     top_risk_factors: List[RiskFactor]
     model_used: str
+    insight: Optional[Any] = Field(None, description="Consulting-grade executive insight")
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +63,7 @@ class BatchPredictResponse(BaseModel):
     medium_risk_count: int
     low_risk_count: int
     predictions: List[ChurnPredictResponse]
+    insight: Optional[Any] = Field(None, description="Consulting-grade executive insight")
 
 
 # ---------------------------------------------------------------------------

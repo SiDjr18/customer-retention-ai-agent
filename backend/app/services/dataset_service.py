@@ -286,4 +286,6 @@ class DatasetService:
             if col is None: continue
             df = df[df[col].astype(str).str.strip().str.lower()==val.strip().lower()]
             applied[canonical] = val
-   
+        sub = df.head(req.limit).replace({np.nan:None})
+        return FilterResponse(total_matches=len(df), returned_rows=len(sub),
+            filters_applied=applied, records=sub.to_dict(orient="records"))

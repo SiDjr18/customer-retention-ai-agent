@@ -1,12 +1,5 @@
 """
 Dataset routes — data engine for 01_Customer_Retention.csv.
-
-Endpoints:
-  GET  /dataset/profile   — full profiling report (dtypes, nulls, duplicates, stats)
-  GET  /dataset/kpis      — business KPI summary
-  GET  /dataset/columns   — column names + dtypes
-  GET  /dataset/sample    — first N rows as JSON
-  POST /dataset/filter    — filtered subset with optional aggregations
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -14,22 +7,21 @@ from typing import Optional
 
 from app.schemas.dataset import (
     DatasetProfileResponse,
-    KPISummaryResponse,
+    EnhancedKPISummaryResponse,
     ColumnsResponse,
     SampleResponse,
     FilterRequest,
     FilterResponse,
 )
 from app.services.dataset_service import DatasetService
+from app.decision_engine.insight_engine import InsightEngine
 
 router = APIRouter()
 
-# Module-level singleton — loaded once on first request, cached afterwards.
 _service: Optional[DatasetService] = None
 
 
 def get_service() -> DatasetService:
-    """Return the cached DatasetService, initialising it on first call."""
     global _service
     if _service is None:
         try:
@@ -39,83 +31,48 @@ def get_service() -> DatasetService:
     return _service
 
 
-# ---------------------------------------------------------------------------
-# GET /dataset/columns
-# ---------------------------------------------------------------------------
 @router.get("/columns", response_model=ColumnsResponse, summary="List all columns")
 async def get_columns() -> ColumnsResponse:
-    """Return every column name and its pandas dtype."""
     return get_service().columns()
 
 
-# ---------------------------------------------------------------------------
-# GET /dataset/sample
-# ---------------------------------------------------------------------------
 @router.get("/sample", response_model=SampleResponse, summary="Preview dataset rows")
 async def get_sample(
     n: int = Query(default=10, ge=1, le=500, description="Number of rows to return"),
 ) -> SampleResponse:
-    """Return the first *n* rows of the dataset as JSON records."""
     return get_service().sample(n)
 
 
-# ---------------------------------------------------------------------------
-# GET /dataset/profile
-# ---------------------------------------------------------------------------
-@router.get(
-    "/profile",
-    response_model=DatasetProfileResponse,
-    summary="Full dataset profile",
-)
+@router.get("/profile", response_model=DatasetProfileResponse, summary="Full dataset profile")
 async def get_profile() -> DatasetProfileResponse:
-    """
-    Return a comprehensive profiling report including:
-    - Shape (rows × columns)
-    - Per-column dtype, null count, null %, unique count
-    - Duplicate row count
-    - Descriptive statistics for numeric columns
-    """
     return get_service().profile()
 
 
-# ---------------------------------------------------------------------------
-# GET /dataset/kpis
-# ---------------------------------------------------------------------------
 @router.get(
     "/kpis",
-    response_model=KPISummaryResponse,
-    summary="Business KPI summary",
+    response_model=EnhancedKPISummaryResponse,
+    summary="Business KPI summary + executive insight",
 )
-async def get_kpis() -> KPISummaryResponse:
+async def get_kpis() -> EnhancedKPISummaryResponse:
     """
-    Return high-level business KPIs:
-    - Total customers
-    - Churn rate (%)
-    - Average Customer Lifetime Value (CLV)
-    - Revenue at risk (sum of CLV for churned / high-risk customers)
-    - Average churn risk score
-    - Average satisfaction score
+    Return high-level business KPIs augmented with consulting-grade executive insight:
+    - core_kpis: total customers, churn rate (%), avg CLV, revenue at risk, breakdowns
+    - business_metrics: revenue_at_risk (risk>0.6), high_value_customers (CLV>75th pct),
+                        churn_concentration (top region)
+    - risk_segments: top 20 groupby(region × customer_segment × plan_type) ranked by revenue at risk
+    - executive_note: narrative summary
+    - insight: executive_summary, key_drivers, business_impact, recommended_actions,
+               expected_outcome, confidence_level
     """
-    return get_service().kpis()
+    svc = get_service()
+    result = svc.enhanced_kpis()
+    try:
+        result.insight = InsightEngine.from_kpis(svc.kpis(), svc.df)
+    except Exception:
+        pass  # insight is optional — never break the core response
+    return result
 
 
-# ---------------------------------------------------------------------------
-# POST /dataset/filter
-# ---------------------------------------------------------------------------
-@router.post(
-    "/filter",
-    response_model=FilterResponse,
-    summary="Filter dataset by dimension values",
-)
+@router.post("/filter", response_model=FilterResponse, summary="Filter dataset by dimension values")
 async def filter_dataset(body: FilterRequest) -> FilterResponse:
-    """
-    Apply one or more dimension filters and return matching records.
-
-    Filterable dimensions:
-      region, state, city_tier, customer_segment,
-      acquisition_channel, plan_type, contract_type
-
-    All filters are combined with AND logic.
-    Omit a field (or set it to null) to skip that filter.
-    """
     return get_service().filter_data(body)
