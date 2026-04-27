@@ -51,10 +51,11 @@ class MultiChatResponse(BaseModel):
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _fmt_usd(v: float) -> str:
-    if v >= 1_000_000: return f"${v/1_000_000:.1f}M"
-    if v >= 1_000:     return f"${v/1_000:.0f}K"
-    return f"${v:,.0f}"
+def _fmt_inr(v: float) -> str:
+    """Format a value in INR: Cr / Lakh / plain ₹."""
+    if v >= 10_000_000: return f"₹{v/10_000_000:.1f} Cr"
+    if v >= 100_000:    return f"₹{v/100_000:.1f} Lakh"
+    return f"₹{v:,.0f}"
 
 
 def _risk_level(churn_pct: float) -> str:
@@ -88,19 +89,19 @@ class DataAnalystAgent:
             executive_summary=(
                 f"Portfolio churn rate is {kpis.churn_rate_pct:.1f}% across "
                 f"{kpis.total_customers:,} customers ({rl} risk). "
-                f"Revenue at risk from churned accounts: {_fmt_usd(kpis.revenue_at_risk)}. "
+                f"Revenue at risk from churned accounts: {_fmt_inr(kpis.revenue_at_risk)}. "
                 f"Top-quartile risk cohort represents an additional "
-                f"{_fmt_usd(biz.revenue_at_risk)} in exposure."
+                f"{_fmt_inr(biz.revenue_at_risk)} in exposure."
             ),
             key_insights=[
                 f"Churn rate: {kpis.churn_rate_pct:.1f}% — classified as {rl}",
-                f"Total revenue at risk (churned CLV): {_fmt_usd(kpis.revenue_at_risk)}",
-                f"Avg CLV: {_fmt_usd(kpis.avg_clv)} | Avg risk score: {kpis.avg_churn_risk_score:.2f}",
+                f"Total revenue at risk (churned CLV): {_fmt_inr(kpis.revenue_at_risk)}",
+                f"Avg CLV: {_fmt_inr(kpis.avg_clv)} | Avg risk score: {kpis.avg_churn_risk_score:.2f}",
                 f"Highest churn segment: {top_seg[0]} ({top_seg[1]*100:.1f}% churn rate)",
                 f"Highest churn region: {top_reg[0]} ({top_reg[1]*100:.1f}% churn rate)",
             ],
             business_impact=BusinessImpact(
-                revenue_at_risk=_fmt_usd(kpis.revenue_at_risk),
+                revenue_at_risk=_fmt_inr(kpis.revenue_at_risk),
                 affected_customers=int(kpis.total_customers * kpis.churn_rate_pct / 100),
                 risk_level=rl,
             ),
@@ -152,7 +153,7 @@ class RetentionStrategistAgent:
                 action=f"{c.recommended_action} — {c.customer_id}",
                 rationale=(
                     f"{c.customer_segment}/{c.plan_type} in {c.region}. "
-                    f"CLV {_fmt_usd(c.estimated_clv)}, risk {c.churn_risk_score:.2f}"
+                    f"CLV {_fmt_inr(c.estimated_clv)}, risk {c.churn_risk_score:.2f}"
                 ),
             ))
         if not actions:
@@ -233,15 +234,15 @@ class ScenarioPlannerAgent:
             executive_summary=result.scenario_summary,
             key_insights=[
                 f"{base.total_at_risk_customers:,} customers in at-risk cohort",
-                f"Current revenue at risk: {_fmt_usd(base.current_revenue_at_risk)}",
+                f"Current revenue at risk: {_fmt_inr(base.current_revenue_at_risk)}",
                 f"Budget covers {sim.customers_reachable:,} customers "
-                f"(avg offer cost: {_fmt_usd(sim.avg_offer_cost)}/customer)",
+                f"(avg offer cost: {_fmt_inr(sim.avg_offer_cost)}/customer)",
                 f"Expected retained: {sim.expected_customers_saved:,} customers "
-                f"→ {_fmt_usd(sim.expected_revenue_saved)} recovered",
+                f"→ {_fmt_inr(sim.expected_revenue_saved)} recovered",
                 f"Estimated ROI: {sim.estimated_roi:.1f}× ({sim.roi_label})",
             ],
             business_impact=BusinessImpact(
-                revenue_at_risk=_fmt_usd(base.current_revenue_at_risk),
+                revenue_at_risk=_fmt_inr(base.current_revenue_at_risk),
                 affected_customers=base.total_at_risk_customers,
                 risk_level=result.confidence_level,
             ),
@@ -291,8 +292,8 @@ class ExecutiveBriefingAgent:
         except Exception:
             exec_summary = (
                 f"Churn is at {kpis.churn_rate_pct:.1f}% — classified as {rl}. "
-                f"Revenue at risk: {_fmt_usd(kpis.revenue_at_risk)}. "
-                f"Top-quartile risk cohort adds {_fmt_usd(biz.revenue_at_risk)} in exposure. "
+                f"Revenue at risk: {_fmt_inr(kpis.revenue_at_risk)}. "
+                f"Top-quartile risk cohort adds {_fmt_inr(biz.revenue_at_risk)} in exposure. "
                 f"{pl.high_priority_count} customers require immediate outreach."
             )
 
@@ -306,7 +307,7 @@ class ExecutiveBriefingAgent:
                 action=c.recommended_action,
                 rationale=(
                     f"Customer {c.customer_id} — {c.customer_segment} / {c.plan_type} "
-                    f"in {c.region}. CLV {_fmt_usd(c.estimated_clv)}"
+                    f"in {c.region}. CLV {_fmt_inr(c.estimated_clv)}"
                 ),
             ))
 
@@ -315,8 +316,8 @@ class ExecutiveBriefingAgent:
             executive_summary=exec_summary,
             key_insights=[
                 f"Churn rate: {kpis.churn_rate_pct:.1f}% ({rl} risk level)",
-                f"Revenue at risk: {_fmt_usd(kpis.revenue_at_risk)} "
-                f"| Top-quartile cohort: {_fmt_usd(biz.revenue_at_risk)}",
+                f"Revenue at risk: {_fmt_inr(kpis.revenue_at_risk)} "
+                f"| Top-quartile cohort: {_fmt_inr(biz.revenue_at_risk)}",
                 f"High-value customers (top 25% CLV): {biz.high_value_customers:,} "
                 f"({biz.high_value_pct:.1f}% of base)",
                 f"Priority outreach queue: {pl.high_priority_count} High, "
@@ -324,7 +325,7 @@ class ExecutiveBriefingAgent:
                 f"Churn concentrated in {top_seg[0]} segment and {top_reg[0]} region",
             ],
             business_impact=BusinessImpact(
-                revenue_at_risk=_fmt_usd(kpis.revenue_at_risk),
+                revenue_at_risk=_fmt_inr(kpis.revenue_at_risk),
                 affected_customers=int(kpis.total_customers * kpis.churn_rate_pct / 100),
                 risk_level=rl,
             ),
