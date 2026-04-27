@@ -320,3 +320,137 @@ class ReportService:
             generated_at=datetime.now(timezone.utc).isoformat(),
             size_bytes=os.path.getsize(filepath),
         )
+
+    # ------------------------------------------------------------------
+    # Structured Markdown report  (POST /reports/markdown)
+    # ------------------------------------------------------------------
+
+    def generate_markdown_report(self, req: ReportRequest) -> ReportResponse:
+        """
+        Build a 6-section business-readable markdown report.
+        Uses: enhanced_kpis(), priority_list(), InsightEngine — no new deps.
+        """
+        from app.decision_engine.insight_engine import InsightEngine
+
+        # ── Gather data ──────────────────────────────────────────────────────
+        enhanced = self._ds.enhanced_kpis()
+        core = enhanced.core_kpis
+        biz  = enhanced.business_metrics
+
+        try:
+            insight = InsightEngine.from_kpis(self._ds.kpis(), self._ds.df)
+        except Exception:
+            insight = None
+
+        top_customers = self._rs.priority_list(top_n=3).customers
+
+        # ── Derived values ───────────────────────────────────────────────────
+        exec_summary = (
+            insight.executive_summary if insight
+            else enhanced.executive_note
+            or f"Churn rate is {core.churn_rate_pct:.1f}% across "
+               f"{core.total_customers:,} customers, with "
+               f"${core.revenue_at_risk:,.0f} revenue at risk."
+        )
+
+        key_insights = (
+            insight.key_drivers[:3] if insight and insight.key_drivers
+            else [
+                f"Churn rate: {core.churn_rate_pct:.1f}% — "
+                f"classified as {self._risk_label(core.churn_rate_pct)}",
+                f"Revenue at risk (churned accounts): ${core.revenue_at_risk:,.0f}",
+                f"Avg churn risk score: {core.avg_churn_risk_score:.2f} "
+                f"(0 = safe · 1 = certain churn)",
+            ]
+        )
+
+        actions = [
+            f"**{c.recommended_action}** — {c.customer_segment} / "
+            f"{c.plan_type} in {c.region} "
+            f"(Risk: {c.churn_risk_score:.2f}, CLV: ${c.estimated_clv:,.0f})"
+            for c in top_customers
+        ] or [
+            "Deploy Premium Retention Offers for Critical-priority accounts",
+            "Schedule Service Recovery Calls within 48 hours for high-risk accounts",
+            "Run monthly check-ins on high-value customers to prevent drift",
+        ]
+
+        risk_label     = insight.business_impact.risk_level if insight and insight.business_impact else "High"
+        confidence     = insight.confidence_level if insight else "Medium"
+        recovery_pct   = 20 if risk_label in ("Critical", "High") else 15
+        recoverable    = biz.revenue_at_risk * recovery_pct / 100
+        now            = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        title          = req.title or "Customer Retention AI — Executive Report"
+
+        # ── Build markdown ───────────────────────────────────────────────────
+        md = "\n".join([
+            f"# {title}",
+            f"_Generated: {now}_\n",
+            "---\n",
+            "## 1. Executive Summary\n",
+            exec_summary, "",
+            "---\n",
+            "## 2. Current State\n",
+            "| Metric | Value |",
+            "|--------|-------|",
+            f"| Total Customers | {core.total_customers:,} |",
+            f"| Churn Rate | {core.churn_rate_pct:.1f}% |",
+            f"| Avg CLV | ${core.avg_clv:,.0f} |",
+            f"| Revenue at Risk (churned) | ${core.revenue_at_risk:,.0f} |",
+            f"| Avg Risk Score | {core.avg_churn_risk_score:.2f} |",
+            f"| Avg Satisfaction | {core.avg_satisfaction_score:.1f}/10 |",
+            "",
+            "---\n",
+            "## 3. Key Insights\n",
+            *[f"- {d}" for d in key_insights],
+            "",
+            "---\n",
+            "## 4. Financial Impact\n",
+            "| Metric | Value |",
+            "|--------|-------|",
+            f"| Revenue at Risk (top-quartile churn risk) | ${biz.revenue_at_risk:,.0f} |",
+            f"| High-Value Customers | {biz.high_value_customers:,} "
+            f"({biz.high_value_pct:.1f}% of base) |",
+            f"| Top Churn Region | {biz.churn_concentration.top_region} "
+            f"({biz.churn_concentration.pct_of_total_churned:.1f}% of churned) |",
+            "",
+            "---\n",
+            "## 5. Recommended Actions\n",
+            *[f"{i+1}. {a}" for i, a in enumerate(actions)],
+            "",
+            "---\n",
+            "## 6. Expected Outcome\n",
+            f"Executing these retention actions targets recovery of approximately "
+            f"**{recovery_pct}%** of at-risk revenue — "
+            f"**${recoverable:,.0f}** in protected revenue. "
+            f"Risk classification: **{risk_label}**.",
+            "",
+            f"_Confidence level: {confidence}_",
+            "",
+            "---",
+            "_Report generated automatically by the Customer Retention AI Agent._",
+        ])
+
+        # ── Save ─────────────────────────────────────────────────────────────
+        filename = f"executive_report_{_ts()}.md"
+        filepath = os.path.join(_ensure_reports_dir(), filename)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(md)
+
+        return ReportResponse(
+            report_type="markdown",
+            filename=filename,
+            download_path=f"/reports/export/{filename}",
+            generated_at=datetime.now(timezone.utc).isoformat(),
+            size_bytes=os.path.getsize(filepath),
+        )
+
+
+    # ── Static helpers ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _risk_label(churn_pct: float) -> str:
+        if churn_pct >= 25: return "Critical"
+        if churn_pct >= 20: return "High"
+        if churn_pct >= 15: return "Elevated"
+        return "Moderate"

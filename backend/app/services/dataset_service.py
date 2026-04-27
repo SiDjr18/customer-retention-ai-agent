@@ -5,8 +5,12 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from app.config import settings
-from app.schemas.dataset import (ColumnInfo, ColumnsResponse, DatasetProfileResponse,
-    FilterRequest, FilterResponse, KPISummaryResponse, SampleResponse)
+from app.schemas.dataset import (
+    ColumnInfo, ColumnsResponse, DatasetProfileResponse,
+    FilterRequest, FilterResponse, KPISummaryResponse, SampleResponse,
+    CoreKPIs, ChurnConcentration, BusinessMetrics, RiskSegment,
+    EnhancedKPISummaryResponse,
+)
 
 _CHURN_ALIASES = ["churn_flag","churned","churn","is_churn"]
 _CLV_ALIASES   = ["estimated_clv","clv","customer_lifetime_value","ltv"]
@@ -104,6 +108,7 @@ class DatasetService:
             numeric_stats=num_stats, categorical_stats=cat_stats)
 
     def kpis(self):
+        """Original KPI method — unchanged, used by agent_service."""
         df = self._df; total = len(df)
         churned = pd.Series([False]*total, index=df.index)
         churn_rate = 0.0
@@ -131,6 +136,143 @@ class DatasetService:
             churn_by_segment=breakdown("customer_segment"),
             churn_by_region=breakdown("region"))
 
+    def enhanced_kpis(self) -> EnhancedKPISummaryResponse:
+        """Enhanced KPI method — adds business_metrics, risk_segments, executive_note."""
+        df = self._df
+        total = len(df)
+
+        # --- Core KPIs (delegate to existing kpis()) ---
+        base = self.kpis()
+        core_kpis = CoreKPIs(
+            total_customers=base.total_customers,
+            churn_rate_pct=base.churn_rate_pct,
+            avg_clv=base.avg_clv,
+            revenue_at_risk=base.revenue_at_risk,
+            avg_churn_risk_score=base.avg_churn_risk_score,
+            avg_satisfaction_score=base.avg_satisfaction_score,
+            churn_by_segment=base.churn_by_segment,
+            churn_by_region=base.churn_by_region,
+        )
+
+        # --- Numeric series ---
+        clv_s = (pd.to_numeric(df[self._clv_col], errors="coerce").fillna(0)
+                 if self._clv_col else pd.Series(0.0, index=df.index))
+        risk_s = (pd.to_numeric(df[self._risk_col], errors="coerce").fillna(0)
+                  if self._risk_col else pd.Series(0.0, index=df.index))
+
+        # revenue_at_risk: sum CLV for top-quartile risk customers (75th percentile threshold)
+        # Using percentile instead of hard 0.6 cutoff so metric is meaningful regardless of score scale
+        risk_75th = risk_s.quantile(0.75)
+        high_risk_mask = risk_s >= risk_75th
+        biz_revenue_at_risk = _safe(clv_s[high_risk_mask].sum())
+
+        # high_value_customers: count where CLV > 75th percentile
+        clv_75th = clv_s.quantile(0.75)
+        hv_mask = clv_s > clv_75th
+        high_value_count = int(hv_mask.sum())
+        high_value_pct = _safe(high_value_count / max(total, 1) * 100, 2)
+
+        # churn_concentration: region with most churned customers
+        region_col = _find_col(df, _FILTER_ALIAS_MAP.get("region", ["region"]))
+        top_region = "Unknown"
+        top_region_count = 0
+        pct_of_total_churned = 0.0
+
+        if region_col and self._churn_col:
+            churned_mask = df[self._churn_col].astype(float) == 1
+            region_churned = df[churned_mask].groupby(region_col).size()
+            if len(region_churned) > 0:
+                top_region = str(region_churned.idxmax())
+                top_region_count = int(region_churned.max())
+                total_churned = int(churned_mask.sum())
+                pct_of_total_churned = _safe(top_region_count / max(total_churned, 1) * 100, 2)
+        elif region_col:
+            # fallback: use high-risk customers
+            region_risk = df[high_risk_mask].groupby(region_col).size()
+            if len(region_risk) > 0:
+                top_region = str(region_risk.idxmax())
+                top_region_count = int(region_risk.max())
+                total_high_risk = int(high_risk_mask.sum())
+                pct_of_total_churned = _safe(top_region_count / max(total_high_risk, 1) * 100, 2)
+
+        churn_concentration = ChurnConcentration(
+            top_region=top_region,
+            customer_count=top_region_count,
+            pct_of_total_churned=pct_of_total_churned,
+        )
+
+        business_metrics = BusinessMetrics(
+            revenue_at_risk=biz_revenue_at_risk,
+            high_value_customers=high_value_count,
+            high_value_pct=high_value_pct,
+            churn_concentration=churn_concentration,
+        )
+
+        # --- Risk Segments: groupby(region, customer_segment, plan_type) ---
+        segment_col = _find_col(df, _FILTER_ALIAS_MAP.get("customer_segment", ["customer_segment"]))
+        plan_col    = _find_col(df, _FILTER_ALIAS_MAP.get("plan_type", ["plan_type"]))
+
+        group_cols = [c for c in [region_col, segment_col, plan_col] if c is not None]
+        risk_segments: List[RiskSegment] = []
+
+        if group_cols:
+            for keys, sub in df.groupby(group_cols):
+                if not isinstance(keys, tuple):
+                    keys = (keys,)
+
+                def _kval(col):
+                    return str(keys[group_cols.index(col)]) if col and col in group_cols else "N/A"
+
+                sub_clv  = (pd.to_numeric(sub[self._clv_col],  errors="coerce").fillna(0)
+                            if self._clv_col  else pd.Series(0.0, index=sub.index))
+                sub_risk = (pd.to_numeric(sub[self._risk_col], errors="coerce").fillna(0)
+                            if self._risk_col else pd.Series(0.0, index=sub.index))
+
+                churn_rate_val = 0.0
+                if self._churn_col:
+                    churn_rate_val = _safe(sub[self._churn_col].astype(float).mean() * 100, 2)
+
+                risk_segments.append(RiskSegment(
+                    region=_kval(region_col),
+                    customer_segment=_kval(segment_col),
+                    plan_type=_kval(plan_col),
+                    customer_count=len(sub),
+                    avg_churn_risk_score=_safe(sub_risk.mean()),
+                    churn_rate=churn_rate_val,
+                    total_clv=_safe(sub_clv.sum()),
+                    revenue_at_risk=_safe(sub_clv[sub_risk >= risk_75th].sum()),
+                ))
+
+        # sort by revenue_at_risk desc, cap at top 20
+        risk_segments.sort(key=lambda x: x.revenue_at_risk, reverse=True)
+        risk_segments = risk_segments[:20]
+
+        # --- Executive Note ---
+        top_seg = risk_segments[0] if risk_segments else None
+        if top_seg:
+            executive_note = (
+                f"Revenue at risk from top-quartile churn-risk customers (risk score ≥ {risk_75th:.2f}): "
+                f"${biz_revenue_at_risk:,.0f}. "
+                f"Highest churn concentration in {top_region} region "
+                f"({pct_of_total_churned:.1f}% of total churned). "
+                f"Top risk segment: {top_seg.customer_segment} / {top_seg.plan_type} in {top_seg.region} "
+                f"({top_seg.churn_rate:.1f}% churn rate, ${top_seg.revenue_at_risk:,.0f} at risk). "
+                f"{high_value_count} high-value customers ({high_value_pct:.1f}% of base) "
+                f"require priority retention outreach."
+            )
+        else:
+            executive_note = (
+                f"Revenue at risk: ${biz_revenue_at_risk:,.0f}. "
+                f"{high_value_count} high-value customers identified for priority retention."
+            )
+
+        return EnhancedKPISummaryResponse(
+            core_kpis=core_kpis,
+            business_metrics=business_metrics,
+            risk_segments=risk_segments,
+            executive_note=executive_note,
+        )
+
     def filter_data(self, req: FilterRequest):
         df = self._df.copy(); applied: Dict[str,str] = {}
         for canonical, val in {
@@ -144,6 +286,4 @@ class DatasetService:
             if col is None: continue
             df = df[df[col].astype(str).str.strip().str.lower()==val.strip().lower()]
             applied[canonical] = val
-        sub = df.head(req.limit).replace({np.nan:None})
-        return FilterResponse(total_matches=len(df), returned_rows=len(sub),
-            filters_applied=applied, records=sub.to_dict(orient="records"))
+   

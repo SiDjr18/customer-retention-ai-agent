@@ -14,17 +14,21 @@ Rule priority (evaluated top-to-bottom; first match wins):
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
+
+import pandas as pd
 
 from app.schemas.recommendation_schema import (
     BatchRecommendRequest,
     BatchRecommendResponse,
     CustomerRecommendRequest,
     CustomerRecommendResponse,
+    PriorityCustomer,
+    PriorityListResponse,
     StrategyBucket,
     StrategySummaryResponse,
 )
-from app.services.dataset_service import DatasetService
+from app.services.dataset_service import DatasetService, _find_col
 
 # ---------------------------------------------------------------------------
 # Rule thresholds (adjust per business context)
@@ -83,6 +87,27 @@ _RULE_REASONS: Dict[str, str] = {
     ),
 }
 
+# ---------------------------------------------------------------------------
+# Priority-list action mapping
+# ---------------------------------------------------------------------------
+_PRIORITY_ACTION: Dict[str, Tuple[str, str]] = {
+    "High Priority": (
+        "Immediate Retention Outreach",
+        "High priority score driven by elevated churn risk and/or CLV — "
+        "immediate personalised outreach required within 48 hours.",
+    ),
+    "Medium Priority": (
+        "Scheduled Retention Touch",
+        "Moderate risk profile warrants proactive but non-urgent retention contact "
+        "within the next 2 weeks.",
+    ),
+    "Low Priority": (
+        "Routine Monitoring",
+        "Low priority score — no immediate action required; "
+        "include in standard monthly monitoring cycle.",
+    ),
+}
+
 
 # ---------------------------------------------------------------------------
 # CLV threshold (loaded lazily from dataset)
@@ -97,7 +122,6 @@ def _get_clv_p75() -> float:
         try:
             svc = DatasetService()
             if svc._clv_col:
-                import pandas as pd
                 clv = pd.to_numeric(svc.df[svc._clv_col], errors="coerce").dropna()
                 _clv_p75 = float(clv.quantile(HIGH_CLV_PERCENTILE / 100))
             else:
@@ -163,6 +187,42 @@ def _expected_revenue_protected(req: CustomerRecommendRequest, recommendation: s
 
 
 # ---------------------------------------------------------------------------
+# Priority score helpers
+# ---------------------------------------------------------------------------
+
+def _safe_float(val, default: float = 0.0) -> float:
+    try:
+        result = float(val)
+        return result if math.isfinite(result) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(val, default: int = 0) -> int:
+    try:
+        return int(float(val))
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize(series: pd.Series) -> pd.Series:
+    """Min-max scale a Series to [0, 1]. Returns zeros if range is zero."""
+    s = pd.to_numeric(series, errors="coerce").fillna(0.0)
+    lo, hi = s.min(), s.max()
+    if hi > lo:
+        return ((s - lo) / (hi - lo)).clip(0.0, 1.0)
+    return pd.Series(0.0, index=s.index)
+
+
+def _priority_class(score: float) -> str:
+    if score >= 0.65:
+        return "High Priority"
+    if score >= 0.40:
+        return "Medium Priority"
+    return "Low Priority"
+
+
+# ---------------------------------------------------------------------------
 # Service
 # ---------------------------------------------------------------------------
 
@@ -199,19 +259,16 @@ class RecommendationService:
         Run NBA rules across the full dataset and aggregate by strategy.
         Requires the DatasetService to be available.
         """
-        import pandas as pd
-
         svc = DatasetService()
         df = svc.df.copy()
 
-        # Map column aliases
         col_map = {
             "churn_risk_score": svc._risk_col,
             "estimated_clv": svc._clv_col,
             "satisfaction_score": svc._sat_col,
         }
 
-        def _get_val(row, preferred: str, fallback: str | None, default: float) -> float:
+        def _get_val(row, preferred: str, fallback, default: float) -> float:
             if fallback and fallback in row.index:
                 try:
                     return float(row[fallback])
@@ -264,4 +321,108 @@ class RecommendationService:
         return StrategySummaryResponse(
             total_customers_analysed=len(results),
             strategies=buckets,
+        )
+
+    # ------------------------------------------------------------------
+    # Customer prioritisation
+    # ------------------------------------------------------------------
+
+    def priority_list(self, top_n: int = 500) -> PriorityListResponse:
+        """
+        Score every customer with:
+            priority_score = (churn_risk_score × 0.5)
+                           + (normalized_clv × 0.3)
+                           + (complaints_weight × 0.2)
+
+        normalized_clv      = min-max scaled estimated_clv → [0, 1]
+        complaints_weight   = min-max scaled complaints_90d → [0, 1]
+        Missing values filled with 0 before scaling.
+
+        Returns the top `top_n` customers sorted by priority_score descending.
+        """
+        svc = DatasetService()
+        df = svc.df.copy()
+
+        # ── Column resolution ────────────────────────────────────────────────
+        risk_col     = svc._risk_col   # churn_risk_score
+        clv_col      = svc._clv_col    # estimated_clv
+        complaints_col = _find_col(df, ["complaints_90d", "complaints", "support_tickets",
+                                        "supporttickets"])
+        cid_col      = _find_col(df, ["customer_id", "customerid", "custid", "id"])
+        region_col   = _find_col(df, ["region", "city", "location"])
+        segment_col  = _find_col(df, ["customer_segment", "segment", "plantype", "plan_type"])
+        plan_col     = _find_col(df, ["plan_type", "plantype", "plan"])
+
+        # ── Numeric series with safe defaults ────────────────────────────────
+        risk_s       = (pd.to_numeric(df[risk_col], errors="coerce").fillna(0.0)
+                        if risk_col else pd.Series(0.0, index=df.index))
+        clv_s        = (pd.to_numeric(df[clv_col], errors="coerce").fillna(0.0)
+                        if clv_col else pd.Series(0.0, index=df.index))
+        complaints_s = (pd.to_numeric(df[complaints_col], errors="coerce").fillna(0.0)
+                        if complaints_col else pd.Series(0.0, index=df.index))
+
+        # ── Normalise to [0, 1] ──────────────────────────────────────────────
+        norm_clv        = _normalize(clv_s)
+        complaints_wt   = _normalize(complaints_s)
+
+        # ── Composite priority score ─────────────────────────────────────────
+        priority_score  = (risk_s * 0.5) + (norm_clv * 0.3) + (complaints_wt * 0.2)
+        priority_score  = priority_score.clip(0.0, 1.0).round(4)
+
+        # Attach computed columns temporarily
+        df = df.assign(
+            _priority_score=priority_score,
+            _norm_clv=norm_clv.round(4),
+        )
+
+        # ── Sort desc and cap ────────────────────────────────────────────────
+        df = df.sort_values("_priority_score", ascending=False).head(top_n)
+
+        # Compute adaptive thresholds from the RETURNED slice.
+        # Classify relative to this cohort so labels are always meaningful:
+        #   top 20% of returned list → High, bottom 35% → Low, rest → Medium
+        _slice_scores = df["_priority_score"]
+        _hi_thresh  = float(_slice_scores.quantile(0.80))
+        _med_thresh = float(_slice_scores.quantile(0.35))
+
+        # ── Build output records ─────────────────────────────────────────────
+        customers: List[PriorityCustomer] = []
+        for idx, row in df.iterrows():
+            score  = _safe_float(row["_priority_score"])
+            pclass = ("High Priority" if score >= _hi_thresh else
+                      "Medium Priority" if score >= _med_thresh else
+                      "Low Priority")
+            action, rationale = _PRIORITY_ACTION[pclass]
+
+            # Derive customer_id from column or row index
+            if cid_col and row.get(cid_col) is not None:
+                cid = str(row[cid_col])
+            else:
+                cid = str(idx)
+
+            customers.append(PriorityCustomer(
+                customer_id=cid,
+                region=str(row[region_col]) if region_col and row.get(region_col) is not None else "Unknown",
+                customer_segment=str(row[segment_col]) if segment_col and row.get(segment_col) is not None else "Unknown",
+                plan_type=str(row[plan_col]) if plan_col and row.get(plan_col) is not None else "Unknown",
+                estimated_clv=_safe_float(row[clv_col]) if clv_col else 0.0,
+                churn_risk_score=_safe_float(row[risk_col]) if risk_col else 0.0,
+                complaints_90d=_safe_int(row[complaints_col]) if complaints_col else 0,
+                priority_score=score,
+                priority_class=pclass,
+                recommended_action=action,
+                rationale=rationale,
+            ))
+
+        # ── Counts by class ──────────────────────────────────────────────────
+        high   = sum(1 for c in customers if c.priority_class == "High Priority")
+        medium = sum(1 for c in customers if c.priority_class == "Medium Priority")
+        low    = sum(1 for c in customers if c.priority_class == "Low Priority")
+
+        return PriorityListResponse(
+            total_returned=len(customers),
+            high_priority_count=high,
+            medium_priority_count=medium,
+            low_priority_count=low,
+            customers=customers,
         )
