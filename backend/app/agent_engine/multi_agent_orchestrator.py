@@ -226,14 +226,14 @@ class ScenarioPlannerAgent:
         sim    = result.simulation
         base   = result.baseline
         rl     = _risk_level(
-            base.total_at_risk_customers / max(1, 5000) * 100
+            base.affected_customers / max(1, 5000) * 100
         )
 
         return MultiChatResponse(
             agent_used=self.NAME,
             executive_summary=result.scenario_summary,
             key_insights=[
-                f"{base.total_at_risk_customers:,} customers in at-risk cohort",
+                f"{base.affected_customers:,} customers in at-risk cohort",
                 f"Current revenue at risk: {_fmt_inr(base.current_revenue_at_risk)}",
                 f"Budget covers {sim.customers_reachable:,} customers "
                 f"(avg offer cost: {_fmt_inr(sim.avg_offer_cost)}/customer)",
@@ -243,7 +243,7 @@ class ScenarioPlannerAgent:
             ],
             business_impact=BusinessImpact(
                 revenue_at_risk=_fmt_inr(base.current_revenue_at_risk),
-                affected_customers=base.total_at_risk_customers,
+                affected_customers=base.affected_customers,
                 risk_level=result.confidence_level,
             ),
             recommended_actions=[
@@ -344,8 +344,89 @@ class ExecutiveBriefingAgent:
 # Keyword Router
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent 5 — Uploaded Data Analyst  (activated when a file has been uploaded)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class UploadedDataAgent:
+    NAME = "UploadedDataAgent"
+
+    def run(self, message: str, context: dict) -> MultiChatResponse:
+        from app.data_engine.universal_data_service import get_latest_upload_context
+        ctx = get_latest_upload_context()
+
+        if ctx is None:
+            return MultiChatResponse(
+                agent_used=self.NAME,
+                executive_summary=(
+                    "No file has been uploaded in this session yet. "
+                    "Use the 'Upload Data' button (top-right) to upload a CSV, Excel, TXT or PDF."
+                ),
+                key_insights=["No uploaded dataset found."],
+                recommended_actions=[
+                    RecommendedAction(
+                        priority="High",
+                        action="Upload a data file to enable file-specific analysis",
+                        rationale="Supports CSV, Excel (.xlsx/.xls), TXT, and PDF",
+                    )
+                ],
+                confidence_level="Low",
+            )
+
+        domain  = ctx.get("detected_domain", "Unknown")
+        rows    = ctx.get("rows", 0)
+        cols    = ctx.get("columns", [])
+        issues  = ctx.get("data_quality_issues", [])
+        metrics = ctx.get("key_metrics", [])
+        recs    = ctx.get("recommended_analysis", [])
+        fname   = ctx.get("filename", "uploaded file")
+
+        return MultiChatResponse(
+            agent_used=self.NAME,
+            executive_summary=ctx.get("executive_summary", f"Analysed '{fname}'."),
+            key_insights=[
+                f"File: {fname} — detected domain: {domain}",
+                f"Shape: {rows:,} rows × {len(cols)} columns",
+                f"Columns: {', '.join(cols[:8])}{'…' if len(cols) > 8 else ''}",
+                f"Key metrics for this domain: {', '.join(metrics[:3])}",
+                f"Data quality: {issues[0] if issues else 'No critical issues detected'}",
+            ],
+            business_impact=BusinessImpact(
+                affected_customers=rows,
+                risk_level="Low" if not issues or issues == ["No critical issues detected"] else "Moderate",
+            ),
+            recommended_actions=[
+                RecommendedAction(
+                    priority="High",
+                    action=recs[0] if recs else "Perform exploratory data analysis",
+                    rationale=f"Primary recommendation for {domain} data",
+                ),
+                RecommendedAction(
+                    priority="Medium",
+                    action=recs[1] if len(recs) > 1 else "Validate data quality before modelling",
+                    rationale="Ensures downstream analysis reliability",
+                ),
+                RecommendedAction(
+                    priority="Low",
+                    action=recs[2] if len(recs) > 2 else "Build baseline KPI dashboard",
+                    rationale="Establishes performance baseline for tracking",
+                ),
+            ],
+            confidence_level="High" if rows > 100 else "Medium",
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Keyword Router
+# ─────────────────────────────────────────────────────────────────────────────
+
 _ROUTES = [
     # (pattern list,  agent class)
+    (["uploaded", "my file", "this file", "this data", "this dataset",
+      "the file", "what is this", "analyze this", "analyse this",
+      "what did i upload", "what's in the file"],
+     UploadedDataAgent),
+
     (["kpi", "churn rate", "revenue at risk", "revenue", "segment",
       "region", "breakdown", "metric", "data", "analys"],
      DataAnalystAgent),
@@ -384,6 +465,14 @@ def _route(message: str) -> type:
 
 class MultiAgentOrchestrator:
     def run(self, req: MultiChatRequest) -> MultiChatResponse:
+        from app.data_engine.universal_data_service import get_latest_upload_context
+
+        # Inject upload context so agents have optional access via context dict
+        ctx = dict(req.context or {})
+        upload_ctx = get_latest_upload_context()
+        if upload_ctx:
+            ctx["_upload_context"] = upload_ctx
+
         agent_cls = _route(req.message)
         agent     = agent_cls()
-        return agent.run(req.message, req.context or {})
+        return agent.run(req.message, ctx)

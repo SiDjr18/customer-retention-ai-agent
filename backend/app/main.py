@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.api.routes import health, dataset, predict, agent, reports, recommend
-from app.api.routes import scenario, multi_agent
+from app.api.routes import scenario, multi_agent, upload
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -39,6 +39,7 @@ app.include_router(reports.router,     prefix="/reports",  tags=["Reports"])
 app.include_router(recommend.router,   prefix="/recommend",tags=["Recommendations"])
 app.include_router(scenario.router,    prefix="/scenario", tags=["Scenario Simulation"])
 app.include_router(multi_agent.router, prefix="/agent",    tags=["Multi-Agent"])
+app.include_router(upload.router,      prefix="/upload",   tags=["Upload"])
 app.include_router(predict.router,     prefix="/model",    tags=["Model"], include_in_schema=True)
 
 
