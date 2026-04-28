@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Customer Retention AI Agent — Live Demo</title>
+<style>
+  :root {
+    --blue:    #2563eb;
+    --blue-d:  #1d4ed8;
+    --blue-l:  #eff6ff;
+    --green:   #16a34a;
+    --green-l: #f0fdf4;
+    --amber:   #d97706;
+    --amber-l: #fffbeb;
+    --red:     #dc2626;
+    --slate-9: #0f172a;
+    --slate-7: #334155;
+    --slate-5: #64748b;
+    --slate-2: #e2e8f0;
+    --slate-1: #f8fafc;
+    --white:   #ffffff;
+    --radius:  12px;
+    --shadow:  0 4px 24px rgba(0,0,0,.08);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #f1f5f9; color: var(--slate-9); line-height: 1.6; }
+
+  /* ── Hero ── */
+  .hero { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1d4ed8 100%);
+          color: #fff; padding: 56px 24px 48px; text-align: center; }
+  .hero-badge { display: inline-block; background: rgba(255,255,255,.12);
+                border: 1px solid rgba(255,255,255,.2); border-radius: 99px;
+                padding: 4px 14px; font-size: 12px; letter-spacing: .5px;
+                margin-bottom: 20px; }
+  .hero h1 { font-size: clamp(26px,5vw,44px); font-weight: 800; line-height: 1.2;
+             margin-bottom: 14px; }
+  .hero h1 span { color: #60a5fa; }
+  .hero p { max-width: 580px; margin: 0 auto 28px; font-size: 16px;
+            color: rgba(255,255,255,.75); }
+  .hero-tags { display: flex; flex-wrap: wrap; gap: 8px;
+               justify-content: center; margin-bottom: 32px; }
+  .tag { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
+         border-radius: 6px; padding: 4px 12px; font-size: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px;
+         border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+         border: none; text-decoration: none; transition: .15s; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: var(--blue-d); }
+  .btn-outline { background: rgba(255,255,255,.1); color: #fff;
+                 border: 1px solid rgba(255,255,255,.3); }
+  .btn-outline:hover { background: rgba(255,255,255,.2); }
+  .hero-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+  /* ── Layout ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+  section { padding: 52px 0; }
+  .section-title { text-align: center; margin-bottom: 36px; }
+  .section-title h2 { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+  .section-title p { color: var(--slate-5); font-size: 15px; }
+
+  /* ── Feature grid ── */
+  .feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: 16px; }
+  .feat-card { background: var(--white); border-radius: var(--radius);
+               padding: 24px; border: 1px solid var(--slate-2); box-shadow: var(--shadow); }
+  .feat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex;
+               align-items: center; justify-content: center; font-size: 20px;
+               margin-bottom: 14px; }
+  .feat-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .feat-card p  { font-size: 13px; color: var(--slate-5); line-height: 1.6; }
+
+  /* ── Upload Demo ── */
+  .demo-box { background: var(--white); border-radius: var(--radius);
+              border: 1px solid var(--slate-2); box-shadow: var(--shadow); overflow: hidden; }
+  .demo-bar { background: var(--slate-9); display: flex; align-items: center;
+              gap: 8px; padding: 12px 16px; }
+  .demo-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .demo-body { padding: 28px; }
+
+  /* Drop zone */
+  .dropzone { border: 2px dashed var(--slate-2); border-radius: 10px;
+              padding: 40px 24px; text-align: center; cursor: pointer;
+              transition: .2s; background: var(--slate-1); }
+  .dropzone:hover, .dropzone.over { border-color: var(--blue); background: var(--blue-l); }
+  .dropzone svg { margin: 0 auto 12px; display: block; }
+  .dropzone p { color: var(--slate-5); font-size: 14px; }
+  .dropzone strong { color: var(--blue); }
+  #fileInput { display: none; }
+
+  /* Result panel */
+  #result { display: none; margin-top: 24px; }
+  .result-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .domain-badge { background: var(--blue); color: #fff; border-radius: 99px;
+                  padding: 3px 12px; font-size: 12px; font-weight: 600; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr));
+             gap: 12px; margin-bottom: 20px; }
+  .kpi-box { background: var(--slate-1); border-radius: 8px; padding: 14px;
+             text-align: center; border: 1px solid var(--slate-2); }
+  .kpi-box .val { font-size: 22px; font-weight: 800; color: var(--blue); }
+  .kpi-box .lbl { font-size: 11px; color: var(--slate-5); margin-top: 2px; }
+
+  .insight-list { list-style: none; display: flex; flex-direction: column; gap: 8px;
+                  margin-bottom: 20px; }
+  .insight-list li { display: flex; align-items: flex-start; gap: 8px;
+                     font-size: 13px; color: var(--slate-7); }
+  .insight-list li::before { content: '→'; color: var(--blue); font-weight: 700;
+                              flex-shrink: 0; margin-top: 1px; }
+
+  .warn-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .warn-list li { display: flex; gap: 8px; font-size: 12px; color: var(--amber);
+                  background: var(--amber-l); padding: 8px 12px; border-radius: 6px; }
+
+  .cols-preview { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+  .col-pill { background: var(--blue-l); color: var(--blue); border-radius: 4px;
+              padding: 2px 10px; font-size: 12px; }
+
+  .action-list { display: flex; flex-direction: column; gap: 8px; }
+  .action-item { display: flex; gap: 10px; align-items: flex-start;
+                 background: var(--green-l); border-radius: 8px; padding: 12px 14px; }
+  .action-pri { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                letter-spacing: .5px; padding: 2px 8px; border-radius: 4px;
+                background: var(--green); color: #fff; flex-shrink: 0; margin-top: 2px; }
+  .action-pri.med { background: var(--amber); }
+  .action-pri.low { background: var(--slate-5); }
+  .action-item p { font-size: 13px; color: var(--slate-7); }
+  .action-item span { font-size: 11px; color: var(--slate-5); }
+
+  /* Spinner */
+  .spinner-wrap { text-align: center; padding: 32px; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--slate-2);
+             border-top-color: var(--blue); border-radius: 50%;
+             animation: spin .8s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Error */
+  .err-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;
+             padding: 16px; color: var(--red); font-size: 14px; }
+
+  /* ── Endpoint table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; background: var(--slate-9);
+       color: #fff; font-weight: 600; }
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child  { border-radius: 0 8px 0 0; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--slate-2); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: var(--slate-1); }
+  .method { font-weight: 700; font-family: monospace; font-size: 11px;
+            padding: 2px 8px; border-radius: 4px; }
+  .get  { background: #dcfce7; color: #15803d; }
+  .post { background: #dbeafe; color: #1d4ed8; }
+  code  { font-family: monospace; font-size: 12px; background: var(--slate-1);
+          padding: 2px 6px; border-radius: 4px; }
+
+  /* ── Flow diagram ── */
+  .flow { display: flex; align-items: center; justify-content: center;
+          flex-wrap: wrap; gap: 0; }
+  .flow-step { background: var(--white); border: 1px solid var(--slate-2);
+               border-radius: 10px; padding: 16px 18px; text-align: center;
+               min-width: 120px; box-shadow: var(--shadow); }
+  .flow-step .ico { font-size: 24px; margin-bottom: 6px; }
+  .flow-step .lbl { font-size: 12px; font-weight: 600; color: var(--slate-7); }
+  .flow-step .sub { font-size: 11px; color: var(--slate-5); margin-top: 2px; }
+  .flow-arrow { font-size: 22px; color: var(--blue); padding: 0 8px;
+                font-weight: 300; user-select: none; }
+
+  /* ── Footer ── */
+  footer { background: var(--slate-9); color: rgba(255,255,255,.5);
+           text-align: center; padding: 24px; font-size: 13px; }
+  footer a { color: #60a5fa; text-decoration: none; }
+
+  /* ── Chat demo ── */
+  .chat-demo { background: var(--slate-1); border-radius: 10px; padding: 16px;
+               display: flex; flex-direction: column; gap: 12px; }
+  .chat-msg { display: flex; gap: 10px; align-items: flex-start; }
+  .chat-msg.user { flex-direction: row-reverse; }
+  .chat-avatar { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+                 display: flex; align-items: center; justify-content: center;
+                 font-size: 13px; font-weight: 700; }
+  .chat-avatar.bot { background: var(--slate-9); color: #fff; }
+  .chat-avatar.usr { background: var(--blue); color: #fff; }
+  .chat-bubble { max-width: 78%; border-radius: 10px; padding: 10px 14px;
+                 font-size: 13px; line-height: 1.6; }
+  .chat-bubble.bot { background: var(--white); border: 1px solid var(--slate-2); color: var(--slate-7); }
+  .chat-bubble.usr { background: var(--blue); color: #fff; }
+
+  @media (max-width: 640px) {
+    .flow-arrow { transform: rotate(90deg); }
+    .flow { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════ HERO -->
+<div class="hero">
+  <div class="hero-badge">🤖 AI-Powered · No External LLM · Production-Grade</div>
+  <h1>Customer Retention<br><span>AI Agent</span></h1>
+  <p>Upload any dataset — CSV, Excel, PDF, or TXT — and get instant domain intelligence, profiling, and retention strategy recommendations.</p>
+  <div class="hero-tags">
+    <span class="tag">FastAPI Backend</span>
+    <span class="tag">React + Tailwind Frontend</span>
+    <span class="tag">Pandas Profiling</span>
+    <span class="tag">7-Domain Inference</span>
+    <span class="tag">Multi-Agent Orchestrator</span>
+    <span class="tag">500 MB File Support</span>
+  </div>
+  <div class="hero-btns">
+    <a href="#demo" class="btn btn-primary">▶ Try Live Demo</a>
+    <a href="https://github.com/SiDjr18/customer-retention-ai-agent" target="_blank" class="btn btn-outline">GitHub →</a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ FEATURES -->
+<section>
+  <div class="container">
+    <div class="section-title">
+      <h2>What this agent can do</h2>
+      <p>Deterministic, rule-based intelligence — no paid API keys required</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="feat-icon" style="background:#eff6ff">📊</div>
+        <h3>Universal File Upload</h3>
+        <p>CSV, Excel (multi-sheet), PDF, and TXT. Large files up to 500 MB handled with chunked pandas reading.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon" style="background:#f0fdf4">🔍</div>
+        <h3>7-Domain Inference</h3>
+        <p>Automatically detects Customer Retention, Revenue Forecasting, HR Analytics, Credit Risk, Fraud Detection, Supply Chain, or General Analytics.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon" style="background:#fdf4ff">🤖</div>
+        <h3>Multi-Agent Chat</h3>
+        <p>5 specialist agents routed by keyword: Data Analyst, Retention Strategist, Scenario Planner, Executive Briefing, and Uploaded Data Agent.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon" style="background:#fff7ed">📈</div>
+        <h3>Scenario Simulation</h3>
+        <p>What-if ROI calculator for retention budgets. Auto-adjusts risk thresholds when sigmoid-compressed scores yield empty cohorts.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon" style="background:#f0fdf4">🎯</div>
+        <h3>Priority Customer List</h3>
+        <p>Ranks customers by weighted score (50% churn risk + 30% CLV + 20% complaints). Adaptive percentile tiers — no hardcoded thresholds.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon" style="background:#fef2f2">📄</div>
+        <h3>Report Generation</h3>
+        <p>PDF, CSV, PowerPoint, and Markdown reports — all generated server-side using ReportLab and python-pptx, no cloud dependencies.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ HOW IT WORKS -->
+<section style="background:var(--white); border-top:1px solid var(--slate-2); border-bottom:1px solid var(--slate-2);">
+  <div class="container">
+    <div class="section-title">
+      <h2>How it works</h2>
+      <p>From file upload to actionable intelligence in seconds</p>
+    </div>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="ico">📂</div>
+        <div class="lbl">Upload File</div>
+        <div class="sub">CSV / XLSX / PDF / TXT</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="ico">⚡</div>
+        <div class="lbl">Auto Profile</div>
+        <div class="sub">Rows, cols, missing, dupes</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="ico">🧠</div>
+        <div class="lbl">Infer Domain</div>
+        <div class="sub">Keyword rule engine</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="ico">🤖</div>
+        <div class="lbl">Agent Routes</div>
+        <div class="sub">Specialist agent selected</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="ico">✅</div>
+        <div class="lbl">Insights + Actions</div>
+        <div class="sub">Recommendations & ROI</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ LIVE DEMO -->
+<section id="demo">
+  <div class="container">
+    <div class="section-title">
+      <h2>Live Upload Demo</h2>
+      <p>Drop any data file — the agent will profile it and return domain intelligence instantly</p>
+    </div>
+
+    <div class="demo-box">
+      <!-- Fake browser chrome -->
+      <div class="demo-bar">
+        <div class="demo-dot" style="background:#ff5f57"></div>
+        <div class="demo-dot" style="background:#febc2e"></div>
+        <div class="demo-dot" style="background:#28c840"></div>
+        <span style="color:rgba(255,255,255,.4);font-size:12px;margin-left:12px">
+          POST http://localhost:8000/upload/data
+        </span>
+      </div>
+
+      <div class="demo-body">
+        <!-- API URL config -->
+        <div style="margin-bottom:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label style="font-size:13px;color:var(--slate-5);white-space:nowrap">API base URL:</label>
+          <input id="apiUrl" value="http://localhost:8000"
+            style="flex:1;min-width:200px;padding:6px 10px;border:1px solid var(--slate-2);
+                   border-radius:6px;font-size:13px;color:var(--slate-7)" />
+          <span style="font-size:12px;color:var(--slate-5)">← change if backend is on a different port</span>
+        </div>
+
+        <!-- Drop zone -->
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+          <svg width="40" height="40" fill="none" stroke="#94a3b8" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+          </svg>
+          <p><strong>Click or drag & drop</strong> your data file here</p>
+          <p style="margin-top:6px;font-size:12px">Accepts .csv · .xlsx · .xls · .txt · .pdf — up to 500 MB</p>
+        </div>
+        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.txt,.pdf" />
+
+        <!-- Result -->
+        <div id="result"></div>
+      </div>
+    </div>
+
+    <!-- Agent chat demo (static) -->
+    <div style="margin-top:32px">
+      <div class="section-title" style="margin-bottom:20px">
+        <h2 style="font-size:20px">AI Agent Chat — Sample Conversation</h2>
+        <p>After uploading a file, ask the agent anything about your data</p>
+      </div>
+      <div class="demo-box">
+        <div class="demo-bar">
+          <div class="demo-dot" style="background:#ff5f57"></div>
+          <div class="demo-dot" style="background:#febc2e"></div>
+          <div class="demo-dot" style="background:#28c840"></div>
+          <span style="color:rgba(255,255,255,.4);font-size:12px;margin-left:12px">
+            POST http://localhost:8000/agent/multi-chat
+          </span>
+        </div>
+        <div class="demo-body">
+          <div class="chat-demo">
+            <div class="chat-msg user">
+              <div class="chat-avatar usr">S</div>
+              <div class="chat-bubble usr">What is this data about?</div>
+            </div>
+            <div class="chat-msg">
+              <div class="chat-avatar bot">🤖</div>
+              <div class="chat-bubble bot">
+                <strong>UploadedDataAgent</strong><br><br>
+                This dataset appears to be a <strong>Customer Retention</strong> dataset across 5,000 rows and 18 columns. Primary use cases include Churn prediction and Retention campaign targeting. Key metrics: Churn rate, Customer Lifetime Value, Monthly Recurring Revenue.<br><br>
+                <em>1 data quality issue flagged: 'contract_type' has 2.1% missing values.</em>
+              </div>
+            </div>
+            <div class="chat-msg user">
+              <div class="chat-avatar usr">S</div>
+              <div class="chat-bubble usr">What is the churn rate and revenue at risk?</div>
+            </div>
+            <div class="chat-msg">
+              <div class="chat-avatar bot">🤖</div>
+              <div class="chat-bubble bot">
+                <strong>DataAnalystAgent</strong><br><br>
+                Portfolio churn rate is <strong>26.4%</strong> across 5,000 customers (<strong>Critical</strong> risk). Revenue at risk from churned accounts: <strong>₹16.8 Cr</strong>. Top-quartile risk cohort represents an additional <strong>₹4.2 Cr</strong> in exposure.<br><br>
+                📍 Highest churn segment: <em>Premium</em> (38.2%) · Highest region: <em>South</em> (31.1%)
+              </div>
+            </div>
+            <div class="chat-msg user">
+              <div class="chat-avatar usr">S</div>
+              <div class="chat-bubble usr">Simulate a ₹5 lakh budget with 10% discount offer</div>
+            </div>
+            <div class="chat-msg">
+              <div class="chat-avatar bot">🤖</div>
+              <div class="chat-bubble bot">
+                <strong>ScenarioPlannerAgent</strong><br><br>
+                Simulating a 10% retention offer for 1,332 at-risk customers. With a ₹5.0 Lakh budget, 1,332 customers can be reached, and ~239 are expected to be retained — recovering <strong>₹3.02 Cr in revenue at 60.3× ROI</strong>. 🏆 Excellent
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ ENDPOINTS -->
+<section style="background:var(--white); border-top:1px solid var(--slate-2);">
+  <div class="container">
+    <div class="section-title">
+      <h2>API Endpoints</h2>
+      <p>Full REST API — explore at <code>http://localhost:8000/docs</code></p>
+    </div>
+    <div style="border-radius:var(--radius);overflow:hidden;border:1px solid var(--slate-2);box-shadow:var(--shadow)">
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th><th>Endpoint</th><th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="method post">POST</span></td><td><code>/upload/data</code></td><td>Upload CSV/Excel/PDF/TXT → profile + domain inference</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/agent/multi-chat</code></td><td>Multi-agent chat (5 specialist agents)</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/scenario/simulate</code></td><td>Retention ROI what-if simulator</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/dataset/kpis</code></td><td>Enhanced KPIs with business metrics + risk segments</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/recommend/priority-list</code></td><td>Top N priority customers ranked by churn + CLV</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/predict/batch</code></td><td>Batch churn probability prediction</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/reports/pdf</code></td><td>Generate PDF executive report</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/reports/markdown</code></td><td>Generate Markdown report (6 sections)</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/dataset/sample</code></td><td>Preview first N rows of loaded dataset</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/health</code></td><td>API health check</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ FOOTER -->
+<footer>
+  <p>Customer Retention AI Agent &nbsp;·&nbsp;
+     Built with FastAPI · React · Pandas · scikit-learn &nbsp;·&nbsp;
+     <a href="https://github.com/SiDjr18/customer-retention-ai-agent" target="_blank">GitHub ↗</a>
+  </p>
+</footer>
+
+<!-- ══════════════════════════════════════════════════════ JS -->
+<script>
+const dropzone  = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const resultDiv = document.getElementById('result');
+
+// Drag & drop styling
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) uploadFile(f);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) uploadFile(e.target.files[0]);
+  e.target.value = '';
+});
+
+async function uploadFile(file) {
+  const api = document.getElementById('apiUrl').value.replace(/\/$/, '');
+
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = `
+    <div class="spinner-wrap">
+      <div class="spinner"></div>
+      <p style="color:var(--slate-5);font-size:14px">Uploading & analysing <strong>${esc(file.name)}</strong>…</p>
+    </div>`;
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  try {
+    const res = await fetch(`${api}/upload/data`, { method: 'POST', body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || 'Upload failed');
+    }
+    const d = await res.json();
+    renderResult(d);
+  } catch (err) {
+    resultDiv.innerHTML = `<div class="err-box">⚠ ${esc(err.message)}<br><br>
+      <small>Make sure the backend is running: <code>python -m uvicorn app.main:app --reload --port 8000</code>
+      <br>and CORS allows this page's origin.</small></div>`;
+  }
+}
+
+function renderResult(d) {
+  const inf  = d.inference || {};
+  const prof = d.profile_summary || {};
+  const cols = d.columns || [];
+  const recs = inf.recommended_analysis || [];
+  const issues = inf.data_quality_issues || [];
+  const warns = d.warnings || [];
+
+  // KPIs
+  const kpis = [
+    { val: (d.rows || 0).toLocaleString(), lbl: 'Rows' },
+    { val: cols.length, lbl: 'Columns' },
+    { val: prof.numeric_columns ? prof.numeric_columns.length : '—', lbl: 'Numeric' },
+    { val: prof.categorical_columns ? prof.categorical_columns.length : '—', lbl: 'Categorical' },
+    { val: prof.duplicate_rows !== undefined ? prof.duplicate_rows.toLocaleString() : '—', lbl: 'Duplicates' },
+  ];
+
+  resultDiv.innerHTML = `
+    <hr style="margin:20px 0;border:none;border-top:1px solid var(--slate-2)">
+
+    <!-- Header -->
+    <div class="result-header">
+      <span style="font-size:18px">✅</span>
+      <span style="font-weight:700;font-size:16px">${esc(d.filename)}</span>
+      <span style="color:var(--slate-5);font-size:13px">${esc(d.file_type?.toUpperCase())}</span>
+      <span class="domain-badge" style="margin-left:auto">${esc(inf.detected_domain || '—')}</span>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row">
+      ${kpis.map(k => `<div class="kpi-box"><div class="val">${k.val}</div><div class="lbl">${k.lbl}</div></div>`).join('')}
+    </div>
+
+    <!-- Executive summary -->
+    ${inf.executive_summary ? `
+    <p style="font-size:13px;color:var(--slate-7);background:var(--blue-l);padding:14px;
+              border-radius:8px;line-height:1.7;margin-bottom:16px">
+      ${esc(inf.executive_summary.replace(/\*\*/g,''))}
+    </p>` : ''}
+
+    <!-- Columns preview -->
+    ${cols.length ? `
+    <p style="font-size:12px;font-weight:600;color:var(--slate-5);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Columns detected</p>
+    <div class="cols-preview" style="margin-bottom:20px">
+      ${cols.slice(0, 20).map(c => `<span class="col-pill">${esc(c)}</span>`).join('')}
+      ${cols.length > 20 ? `<span class="col-pill" style="background:var(--slate-2);color:var(--slate-5)">+${cols.length - 20} more</span>` : ''}
+    </div>` : ''}
+
+    <!-- Use cases + Key metrics -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+      ${inf.possible_use_cases ? `
+      <div>
+        <p style="font-size:12px;font-weight:600;color:var(--slate-5);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Use cases</p>
+        <ul class="insight-list">
+          ${inf.possible_use_cases.slice(0,4).map(u => `<li>${esc(u)}</li>`).join('')}
+        </ul>
+      </div>` : ''}
+      ${inf.key_metrics ? `
+      <div>
+        <p style="font-size:12px;font-weight:600;color:var(--slate-5);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Key metrics</p>
+        <ul class="insight-list">
+          ${inf.key_metrics.slice(0,4).map(m => `<li>${esc(m)}</li>`).join('')}
+        </ul>
+      </div>` : ''}
+    </div>
+
+    <!-- Recommended analysis -->
+    ${recs.length ? `
+    <p style="font-size:12px;font-weight:600;color:var(--slate-5);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Recommended analysis</p>
+    <div class="action-list" style="margin-bottom:20px">
+      ${recs.map((r, i) => `
+        <div class="action-item">
+          <span class="action-pri ${i===1?'med':i===2?'low':''}">${i===0?'High':i===1?'Medium':'Low'}</span>
+          <div><p>${esc(r)}</p></div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    <!-- Data quality -->
+    ${issues.length && issues[0] !== 'No critical issues detected' ? `
+    <p style="font-size:12px;font-weight:600;color:var(--slate-5);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Data quality issues</p>
+    <ul class="insight-list" style="margin-bottom:16px">
+      ${issues.map(i => `<li style="color:var(--red)">${esc(i)}</li>`).join('')}
+    </ul>` : `
+    <p style="font-size:13px;color:var(--green);margin-bottom:16px">✅ No critical data quality issues detected</p>`}
+
+    <!-- Warnings -->
+    ${warns.length ? `
+    <ul class="warn-list">
+      ${warns.map(w => `<li>⚠ ${esc(w)}</li>`).join('')}
+    </ul>` : ''}
+
+    <!-- Agent hint -->
+    <div style="margin-top:20px;padding:14px;background:var(--slate-1);border-radius:8px;
+                font-size:13px;color:var(--slate-5);border:1px solid var(--slate-2)">
+      💡 Now open the <strong>AI Agent</strong> tab in the dashboard and ask:<br>
+      <em style="color:var(--blue)">"What is this data about?"</em> or <em style="color:var(--blue)">"Analyse my uploaded file"</em>
+    </div>`;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
