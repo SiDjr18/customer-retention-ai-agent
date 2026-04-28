@@ -3,8 +3,12 @@ Application configuration via Pydantic BaseSettings.
 All values can be overridden with environment variables.
 """
 
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+
+# Project root = two levels above this file (backend/app/config.py → project root)
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class Settings(BaseSettings):
@@ -32,14 +36,4 @@ class Settings(BaseSettings):
     # LLM / Agent
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
-    AGENT_MAX_TOKENS: int = 1024
-
-    # Data paths
-    DATA_DIR: str = "data"
-    DATASET_FILENAME: str = "01_Customer_Retention.csv"
-
-    # Reports
-    REPORTS_DIR: str = "reports"
-
-
-settings = Settings()
+    AGENT_MAX_TOK
