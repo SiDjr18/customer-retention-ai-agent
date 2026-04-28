@@ -7,7 +7,7 @@ import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
-# Project root = two levels above this file (backend/app/config.py → project root)
+# Project root = two levels above this file (backend/app/config.py -> project root)
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -30,10 +30,20 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
 
-    # Database (placeholder — swap for your real DB URL)
+    # Database
     DATABASE_URL: str = "sqlite:///./retention.db"
 
-    # LLM / Agent
+    # LLM / Agent (not required — agent is fully rule-based, no paid API used)
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
-    AGENT_MAX_TOK
+    AGENT_MAX_TOKENS: int = 1024
+
+    # Data paths — absolute so uvicorn launch directory does not matter
+    DATA_DIR: str = os.path.join(_PROJECT_ROOT, "data")
+    DATASET_FILENAME: str = "01_Customer_Retention.csv"
+
+    # Reports — absolute path
+    REPORTS_DIR: str = os.path.join(_PROJECT_ROOT, "reports")
+
+
+settings = Settings()
