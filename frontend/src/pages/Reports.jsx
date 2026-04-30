@@ -81,7 +81,7 @@ export default function Reports() {
         <ReportCard
           icon={FileText}
           title="PDF Executive Report"
-          description="KPI snapshot, churn drivers, regional breakdown, and recommendations."
+          description="McKinsey-style 6-section report: executive summary, KPI dashboard, churn analysis, financial impact, priority customers, strategic recommendations."
           format="PDF"
           loading={state.pdf.loading}
           result={state.pdf.result}
@@ -90,9 +90,9 @@ export default function Reports() {
         />
         <ReportCard
           icon={FileSpreadsheet}
-          title="CSV Customer Action List"
-          description="High-risk customers enriched with NBA recommendations."
-          format="CSV"
+          title="Excel Strategic Workbook"
+          description="5-sheet McKinsey workbook: KPI dashboard, churn breakdown, priority list, financial model, 90-day action plan."
+          format="Excel"
           loading={state.csv.loading}
           result={state.csv.result}
           error={state.csv.error}
@@ -100,8 +100,8 @@ export default function Reports() {
         />
         <ReportCard
           icon={Presentation}
-          title="PPT Business Summary"
-          description="PowerPoint deck (or Markdown fallback) for leadership review."
+          title="PowerPoint Deck"
+          description="10-slide McKinsey-style deck: cover, agenda, executive summary, KPI dashboard, churn analysis, financial impact, priority customers, recommendations, roadmap, ROI."
           format="PPT"
           loading={state.ppt.loading}
           result={state.ppt.result}
