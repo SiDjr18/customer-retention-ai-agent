@@ -49,10 +49,37 @@ class DatasetService:
         self._sat_col   = _find_col(self._df, _SAT_ALIASES)
 
     def _load_and_enrich(self) -> pd.DataFrame:
-        path = os.path.join(settings.DATA_DIR, settings.DATASET_FILENAME)
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Dataset not found at '{path}'.")
-        df = pd.read_csv(path, low_memory=False)
+        # Prefer a user-uploaded Customer Retention dataset if one is active
+        from app.data_engine.universal_data_service import get_active_file_path, get_latest_upload_context
+        active_path = get_active_file_path()
+        upload_ctx  = get_latest_upload_context()
+        use_upload  = (
+            active_path
+            and os.path.exists(active_path)
+            and upload_ctx
+            and upload_ctx.get("detected_domain") == "Customer Retention"
+        )
+        if use_upload:
+            path = active_path
+            file_size = os.path.getsize(path)
+            ext = os.path.splitext(path)[1].lower()
+            LARGE = 200 * 1024 * 1024  # 200 MB threshold for sampling
+            if ext in ('.xls', '.xlsx'):
+                df = pd.read_excel(path, nrows=500_000)
+            elif file_size > LARGE:
+                # Sample large files to avoid OOM
+                chunks, rows_read = [], 0
+                for chunk in pd.read_csv(path, chunksize=10_000, low_memory=True):
+                    chunks.append(chunk); rows_read += len(chunk)
+                    if rows_read >= 500_000: break
+                df = pd.concat(chunks, ignore_index=True)
+            else:
+                df = pd.read_csv(path, low_memory=False)
+        else:
+            path = os.path.join(settings.DATA_DIR, settings.DATASET_FILENAME)
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Dataset not found at '{path}'.")
+            df = pd.read_csv(path, low_memory=False)
         df.columns = [c.strip().lower().replace(" ","_") for c in df.columns]
 
         def gc(name, fill):

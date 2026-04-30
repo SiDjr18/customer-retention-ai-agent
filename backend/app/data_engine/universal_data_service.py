@@ -33,6 +33,8 @@ import pandas as pd
 # ─────────────────────────────────────────────────────────────────────────────
 
 _LATEST_UPLOAD: Optional[Dict[str, Any]] = None
+_ACTIVE_FILE_PATH: Optional[str] = None         # path to the last successfully processed tabular file
+_ACTIVE_DF: Optional["pd.DataFrame"] = None     # in-memory sample of the last uploaded tabular file
 
 LARGE_FILE_THRESHOLD_BYTES = 50 * 1024 * 1024   # 50 MB → sample profiling
 SAMPLE_ROWS_FOR_PROFILE    = 100_000             # rows to read for large files
@@ -42,6 +44,27 @@ MAX_TEXT_SAMPLE            = 8_000               # chars for TXT/PDF preview
 def get_latest_upload_context() -> Optional[Dict[str, Any]]:
     """Return the inference context from the most recently uploaded file."""
     return _LATEST_UPLOAD
+
+
+def get_active_file_path() -> Optional[str]:
+    """Return the file-system path of the last successfully uploaded tabular file."""
+    return _ACTIVE_FILE_PATH
+
+
+def get_active_dataframe() -> Optional["pd.DataFrame"]:
+    """Return an in-memory sample (≤500 K rows) of the last uploaded tabular file."""
+    return _ACTIVE_DF
+
+
+def set_active_file_path(path: str) -> None:
+    """Called by upload.py after the file is moved to its permanent location."""
+    global _ACTIVE_FILE_PATH
+    _ACTIVE_FILE_PATH = path
+
+
+def _set_active_df(df: "pd.DataFrame") -> None:
+    global _ACTIVE_DF
+    _ACTIVE_DF = df.copy() if df is not None else None
 
 
 def _set_latest_upload(ctx: Dict[str, Any]) -> None:
@@ -439,6 +462,10 @@ def process_upload(
         # Text-only path (PDF / unparseable TXT)
         profile["text_sample"] = text_sample or ""
         inference = infer_dataset_context(text_sample, original_filename)
+
+    # Persist DataFrame for live-query access
+    if df is not None:
+        _set_active_df(df)
 
     # Build response
     file_id = str(uuid.uuid4())

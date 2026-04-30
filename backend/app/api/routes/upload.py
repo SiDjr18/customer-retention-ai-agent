@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from app.data_engine.universal_data_service import (
     EXTENSION_MAP,
     process_upload,
+    set_active_file_path,
 )
 
 router = APIRouter()
@@ -28,7 +29,7 @@ _UPLOADS_DIR = os.path.join(
 )
 _UPLOADS_DIR = os.path.normpath(_UPLOADS_DIR)
 
-_MAX_FILE_SIZE = 500 * 1024 * 1024   # 500 MB hard cap
+_MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2 GB hard cap
 
 _ALLOWED_EXTENSIONS = set(EXTENSION_MAP.keys())  # .csv .xlsx .xls .txt .pdf
 
@@ -82,7 +83,7 @@ async def upload_data(file: UploadFile = File(...)) -> JSONResponse:
                     os.unlink(tmp_path)
                     raise HTTPException(
                         status_code=413,
-                        detail=f"File exceeds 500 MB limit ({total / 1024**2:.0f} MB received so far).",
+                        detail=f"File exceeds 2 GB limit ({total / 1024**3:.2f} GB received so far).",
                     )
                 tmp.write(chunk)
     except HTTPException:
@@ -111,6 +112,9 @@ async def upload_data(file: UploadFile = File(...)) -> JSONResponse:
     dest = os.path.join(_UPLOADS_DIR, f"{result['file_id']}{ext}")
     try:
         shutil.move(tmp_path, dest)
+        # Register final path so DatasetService and agents can use it
+        if result.get("file_type") in ("csv", "xls", "xlsx"):
+            set_active_file_path(dest)
     except OSError:
         pass   # keep temp file if move fails — not fatal
 
