@@ -53,3 +53,20 @@ notebooks/.ipynb_checkpoints/
 # ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
 logs/
+
+# ── Uploads (user-uploaded files) ─────────────────────────────────────────────
+backend/uploads/*.csv
+backend/uploads/*.xlsx
+backend/uploads/*.xls
+backend/uploads/tmp*
+!backend/uploads/.gitkeep
+
+# ── Generated reports ─────────────────────────────────────────────────────────
+backend/reports/*.md
+backend/reports/*.pdf
+backend/reports/*.xlsx
+!backend/reports/.gitkeep
+reports/*.xlsx
+
+# ── Large binary/data files ───────────────────────────────────────────────────
+8_Realistic_Large_Analytics_Datasets.xlsx
