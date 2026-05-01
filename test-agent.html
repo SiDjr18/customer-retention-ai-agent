@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent API Tester — Customer Retention AI</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f1f5f9; color: #1e293b; height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #0f172a; color: #fff;
+      padding: 14px 24px; display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    }
+    header .dot { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
+    header h1 { font-size: 15px; font-weight: 600; }
+    header p  { font-size: 12px; color: #94a3b8; margin-left: auto; }
+    #status-badge {
+      font-size: 11px; padding: 3px 10px; border-radius: 20px;
+      background: #1e3a5f; color: #93c5fd; font-weight: 600; margin-left: 8px;
+    }
+
+    /* ── Suggestion chips ── */
+    #chips {
+      background: #fff; border-bottom: 1px solid #e2e8f0;
+      padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .chip {
+      font-size: 12px; padding: 5px 12px; border-radius: 20px;
+      background: #f8fafc; border: 1px solid #cbd5e1; color: #475569;
+      cursor: pointer; transition: all .15s;
+    }
+    .chip:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+
+    /* ── Chat area ── */
+    #chat {
+      flex: 1; overflow-y: auto; padding: 20px 24px;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+
+    /* ── Message bubbles ── */
+    .msg { display: flex; gap: 10px; max-width: 100%; }
+    .msg.user { flex-direction: row-reverse; }
+    .avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0; margin-top: 2px;
+    }
+    .msg.user  .avatar { background: #2563eb; }
+    .msg.agent .avatar { background: #334155; }
+    .bubble {
+      max-width: 78%; padding: 12px 16px; border-radius: 14px;
+      font-size: 13.5px; line-height: 1.55;
+    }
+    .msg.user  .bubble { background: #2563eb; color: #fff; border-radius: 14px 4px 14px 14px; }
+    .msg.agent .bubble { background: #fff; border: 1px solid #e2e8f0; color: #1e293b; border-radius: 4px 14px 14px 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+
+    /* ── Agent response layout ── */
+    .agent-badge { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+    .agent-name  { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #64748b; }
+    .conf-badge  { font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+    .conf-High   { background: #dcfce7; color: #15803d; }
+    .conf-Medium { background: #fef9c3; color: #854d0e; }
+    .conf-Low    { background: #f1f5f9; color: #475569; }
+
+    .exec-summary { font-size: 13.5px; color: #1e293b; line-height: 1.6; margin-bottom: 10px; }
+
+    .impact-box {
+      border-radius: 8px; border: 1px solid; padding: 8px 12px;
+      display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 10px; font-size: 12px;
+    }
+    .impact-box.critical,.impact-box.high { background: #fff1f2; border-color: #fecaca; }
+    .impact-box.moderate,.impact-box.elevated { background: #fffbeb; border-color: #fde68a; }
+    .impact-box.low { background: #f0fdf4; border-color: #bbf7d0; }
+    .impact-item .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #64748b; }
+    .impact-item .val { font-weight: 700; font-size: 14px; color: #1e293b; }
+
+    .section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #94a3b8; margin: 8px 0 4px;
+    }
+    .insight-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .insight-list li {
+      font-size: 12.5px; color: #374151; display: flex; gap: 6px; align-items: flex-start;
+    }
+    .insight-list li::before { content: '→'; color: #3b82f6; flex-shrink: 0; margin-top: 1px; }
+
+    .action-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+    .action-item {
+      border-radius: 8px; border: 1px solid; padding: 7px 10px;
+      display: flex; align-items: flex-start; gap: 8px; font-size: 12px;
+    }
+    .action-item.High   { background: #fff1f2; border-color: #fecaca; }
+    .action-item.Medium { background: #fffbeb; border-color: #fde68a; }
+    .action-item.Low    { background: #f0fdf4; border-color: #bbf7d0; }
+    .action-text { flex: 1; }
+    .action-text strong { display: block; font-weight: 600; margin-bottom: 2px; }
+    .action-text span   { color: #6b7280; font-size: 11px; }
+    .priority-tag { font-size: 10px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+
+    /* ── Typing indicator ── */
+    .typing { display: flex; gap: 4px; padding: 4px 0; }
+    .typing span {
+      width: 7px; height: 7px; border-radius: 50%; background: #94a3b8;
+      animation: bounce .9s ease-in-out infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: .15s; }
+    .typing span:nth-child(3) { animation-delay: .3s; }
+    @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+
+    /* ── Input bar ── */
+    #input-bar {
+      background: #fff; border-top: 1px solid #e2e8f0;
+      padding: 14px 20px; display: flex; gap: 10px;
+    }
+    #input-bar input {
+      flex: 1; border: 1px solid #e2e8f0; border-radius: 10px;
+      padding: 10px 14px; font-size: 13.5px; outline: none;
+      transition: border .2s;
+    }
+    #input-bar input:focus { border-color: #3b82f6; }
+    #input-bar button {
+      background: #2563eb; color: #fff; border: none;
+      border-radius: 10px; padding: 10px 18px; font-size: 13.5px;
+      font-weight: 600; cursor: pointer; transition: background .2s;
+    }
+    #input-bar button:hover  { background: #1d4ed8; }
+    #input-bar button:disabled { background: #93c5fd; cursor: default; }
+
+    #api-url-bar {
+      background: #0f172a; padding: 6px 20px;
+      display: flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8;
+    }
+    #api-url-bar input {
+      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      border-radius: 6px; padding: 4px 10px; font-size: 12px; flex: 1; outline: none;
+    }
+    #api-url-bar label { flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="dot"></div>
+  <h1>Customer Retention AI — Agent Tester</h1>
+  <span id="status-badge">Checking backend…</span>
+  <p>Open start.bat first → backend on :8000</p>
+</header>
+
+<div id="api-url-bar">
+  <label>API URL:</label>
+  <input id="api-url" value="http://localhost:8000" />
+  <span id="ping-result"></span>
+</div>
+
+<div id="chips">
+  <span style="font-size:11px;color:#94a3b8;margin-right:4px;align-self:center;">Try:</span>
+  <div class="chip" onclick="send(this.textContent)">What is the churn rate?</div>
+  <div class="chip" onclick="send(this.textContent)">Give me an executive summary</div>
+  <div class="chip" onclick="send(this.textContent)">Which region has the highest churn?</div>
+  <div class="chip" onclick="send(this.textContent)">Which segment has the highest churn?</div>
+  <div class="chip" onclick="send(this.textContent)">What is the revenue at risk?</div>
+  <div class="chip" onclick="send(this.textContent)">Who are the top priority customers for outreach?</div>
+  <div class="chip" onclick="send(this.textContent)">Recommend retention strategies for premium customers</div>
+  <div class="chip" onclick="send(this.textContent)">Simulate a $500,000 retention campaign with 10% discount</div>
+  <div class="chip" onclick="send(this.textContent)">How is customer satisfaction?</div>
+  <div class="chip" onclick="send(this.textContent)">What did I upload?</div>
+</div>
+
+<div id="chat"></div>
+
+<div id="input-bar">
+  <input id="msg-input" placeholder="Ask anything about your customer data…"
+         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}" />
+  <button id="send-btn" onclick="send()">Send</button>
+</div>
+
+<script>
+const API = () => document.getElementById('api-url').value.replace(/\/$/, '');
+const chat = document.getElementById('chat');
+const input = document.getElementById('msg-input');
+const btn   = document.getElementById('send-btn');
+const badge = document.getElementById('status-badge');
+const ping  = document.getElementById('ping-result');
+
+// ── Health check ──────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API()}/health`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      badge.textContent = '● Backend online';
+      badge.style.background = '#14532d'; badge.style.color = '#86efac';
+      ping.textContent = '✓ connected'; ping.style.color = '#86efac';
+    } else { throw new Error(r.status); }
+  } catch {
+    badge.textContent = '● Backend offline';
+    badge.style.background = '#7f1d1d'; badge.style.color = '#fca5a5';
+    ping.textContent = '✗ not reachable — run start.bat'; ping.style.color = '#fca5a5';
+  }
+}
+checkHealth();
+document.getElementById('api-url').addEventListener('change', checkHealth);
+
+// ── Welcome message ───────────────────────────────────────────────────────────
+addAgentMsg({
+  agent_used: 'CustomerRetentionAgent',
+  confidence_level: 'High',
+  executive_summary: "Hi! I'm your Customer Retention AI Agent. Click a suggestion above or type any question about churn, revenue risk, priority customers, segments, regions, or campaign simulations.",
+  key_insights: ['14 question intents detected — each gives a focused, specific answer', 'No paid APIs — fully deterministic and real-time'],
+  recommended_actions: [],
+});
+
+// ── Send message ──────────────────────────────────────────────────────────────
+async function send(text) {
+  const msg = (text || input.value).trim();
+  if (!msg || btn.disabled) return;
+  input.value = '';
+  addUserMsg(msg);
+  btn.disabled = true;
+
+  const typingEl = addTyping();
+  try {
+    const res = await fetch(`${API()}/agent/multi-chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+    });
+    typingEl.remove();
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      addAgentMsg({ agent_used: 'Error', confidence_level: 'Low',
+        executive_summary: `Error ${res.status}: ${err.detail || res.statusText}`,
+        key_insights: [], recommended_actions: [] });
+    } else {
+      addAgentMsg(await res.json());
+    }
+  } catch (e) {
+    typingEl.remove();
+    addAgentMsg({ agent_used: 'ConnectionError', confidence_level: 'Low',
+      executive_summary: `Could not reach the backend at ${API()}. Make sure start.bat is running.`,
+      key_insights: [e.message], recommended_actions: [] });
+  } finally {
+    btn.disabled = false;
+    input.focus();
+  }
+}
+
+// ── Render helpers ────────────────────────────────────────────────────────────
+function addUserMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'msg user';
+  el.innerHTML = `<div class="avatar">👤</div><div class="bubble">${esc(text)}</div>`;
+  chat.appendChild(el);
+  el.scrollIntoView({ behavior: 'smooth' });
+}
+
+function addTyping() {
+  const el = document.createElement('div');
+  el.className = 'msg agent';
+  el.innerHTML = `<div class="avatar">🤖</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  chat.appendChild(el);
+  el.scrollIntoView({ behavior: 'smooth' });
+  return el;
+}
+
+function addAgentMsg(data) {
+  const el = document.createElement('div');
+  el.className = 'msg agent';
+  const conf  = data.confidence_level || 'Medium';
+  const imp   = data.business_impact;
+  const rl    = (imp?.risk_level || 'Moderate').toLowerCase();
+  const insights = (data.key_insights || []).filter(Boolean);
+  const actions  = (data.recommended_actions || []);
+
+  let html = `<div class="avatar">🤖</div><div class="bubble">`;
+
+  // Badge row
+  html += `<div class="agent-badge">
+    <span class="agent-name">${esc(data.agent_used || '')}</span>
+    <span class="conf-badge conf-${conf}">${conf} confidence</span>
+  </div>`;
+
+  // Executive summary
+  if (data.executive_summary)
+    html += `<div class="exec-summary">${esc(data.executive_summary)}</div>`;
+
+  // Business impact
+  if (imp && (imp.revenue_at_risk || imp.affected_customers)) {
+    html += `<div class="impact-box ${rl}">`;
+    if (imp.revenue_at_risk)
+      html += `<div class="impact-item"><div class="lbl">Revenue at Risk</div><div class="val">${esc(imp.revenue_at_risk)}</div></div>`;
+    if (imp.affected_customers != null)
+      html += `<div class="impact-item"><div class="lbl">Affected Customers</div><div class="val">${Number(imp.affected_customers).toLocaleString()}</div></div>`;
+    html += `<div class="impact-item"><div class="lbl">Risk Level</div><div class="val">${esc(imp.risk_level)}</div></div>`;
+    html += `</div>`;
+  }
+
+  // Key insights
+  if (insights.length) {
+    html += `<div class="section-label">Key Insights</div><ul class="insight-list">`;
+    insights.forEach(i => { html += `<li>${esc(i)}</li>`; });
+    html += `</ul>`;
+  }
+
+  // Recommended actions
+  if (actions.length) {
+    html += `<div class="section-label">Recommended Actions</div><div class="action-list">`;
+    actions.forEach(a => {
+      const pri = a.priority || 'Medium';
+      html += `<div class="action-item ${pri}">
+        <div class="action-text">
+          <strong>${esc(a.action)}</strong>
+          <span>${esc(a.rationale)}</span>
+        </div>
+        <span class="priority-tag">${pri}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  el.innerHTML = html;
+  chat.appendChild(el);
+  el.scrollIntoView({ behavior: 'smooth' });
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
